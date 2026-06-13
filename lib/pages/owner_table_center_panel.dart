@@ -9,6 +9,7 @@ import '../state/order_state.dart';
 import 'owner_add_order_page.dart';
 import '../../billing/billing_calculator.dart';
 import '../utils/price_format.dart';
+import '../utils/confirm_order_deletion.dart';
 import '../state/realtime_state.dart';
 
 
@@ -331,6 +332,9 @@ class _OwnerTableCenterPanelState extends State<OwnerTableCenterPanel> {
              TextButton(
                 onPressed: orderData != null
                     ? () async {
+                        final confirmed = await confirmOrderDeletion(context);
+                        if (!confirmed || !context.mounted) return;
+
                         if (orderState.isRealtimeOrderId(orderData.id)) {
                           await _rtRemoveOrderLines(orderData);
                         }

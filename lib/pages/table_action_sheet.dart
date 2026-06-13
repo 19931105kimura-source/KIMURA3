@@ -4,6 +4,7 @@ import '../state/order_state.dart';
 import '../../billing/billing_calculator.dart';
 import 'owner_add_order_page.dart';
 import '../utils/price_format.dart';
+import '../utils/confirm_order_deletion.dart';
 
 
 
@@ -109,6 +110,9 @@ class TableActionSheet extends StatelessWidget {
             onPressed: order.isEmpty
                 ? null
                 : () async {
+                    final confirmed = await confirmOrderDeletion(context);
+                    if (!confirmed || !context.mounted) return;
+
                     final ok = await orderState.removeOrder(order.first.id);
                     if (!ok) {
                       if (!context.mounted) return;

@@ -4,6 +4,7 @@ import '../state/order_state.dart';
 import 'owner_tables_page.dart';
 import '../../billing/billing_calculator.dart';
 import '../utils/price_format.dart';
+import '../utils/confirm_order_deletion.dart';
 
 class OwnerOrdersPage extends StatelessWidget {
   const OwnerOrdersPage({super.key});
@@ -96,6 +97,10 @@ class OwnerOrdersPage extends StatelessWidget {
                             IconButton(
                               icon: const Icon(Icons.delete),
                               onPressed: () async {
+                                final confirmed =
+                                    await confirmOrderDeletion(context);
+                                if (!confirmed || !context.mounted) return;
+
                                 final ok = await context
                                     .read<OrderState>()
                                     .removeOrder(o.id);
