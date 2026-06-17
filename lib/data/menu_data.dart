@@ -8,6 +8,7 @@ class MenuData extends ChangeNotifier {
   static const String fixedEtcCategory = 'etc';
   String normalizePrintGroup(String? value) {
     final raw = (value ?? '').toLowerCase();
+    if (raw == 'both') return 'both';
     if (raw == 'register' || raw == 'food') return 'register';
     if (raw == 'kitchen' || raw == 'drink') return 'kitchen';
     return 'kitchen';

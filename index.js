@@ -283,9 +283,24 @@ function ensureTableOrderId(tableId) {
 function normalizePrintTarget(value) {
   const raw = String(value ?? "").toLowerCase();
   if (raw === "none" || raw === "off" || raw === "false") return "none";
+  if (raw === "both") return "both";
   if (raw === "register" || raw === "food") return "register";
   if (raw === "kitchen" || raw === "drink") return "kitchen";
   return "kitchen";
+}
+
+function printTargetsFor(value) {
+  const target = normalizePrintTarget(value);
+  if (target === "both") return ["kitchen", "register"];
+  if (target === "none") return [];
+  return [target];
+}
+
+function shouldPrintToTarget(item, target) {
+  const normalizedTarget = normalizePrintTarget(target);
+  return printTargetsFor(item.printGroup ?? item.printTarget).includes(
+    normalizedTarget,
+  );
 }
 
 function readIntEnv(name, fallback) {
@@ -438,8 +453,8 @@ async function printOrderSlip({ tableId, target, items }) {
   const sourceItems = Array.isArray(items) ? items : getTableItems(tableId);
   const printableItems = sourceItems.filter((item) => {
     if (item.shouldPrint === false) return false;
-    const itemTarget = normalizePrintTarget(item.printGroup ?? item.printTarget);
-    return itemTarget === normalizedTarget && itemTarget !== "none" && Number(item.quantity ?? 0) > 0;
+    return shouldPrintToTarget(item, normalizedTarget) &&
+      Number(item.quantity ?? 0) > 0;
   });
 
   if (printableItems.length === 0) {
@@ -1327,11 +1342,11 @@ try {
 
  const printTargets = Array.from(
     new Set(
-      printDeltaItems.map((item) =>
-        normalizePrintTarget(item.printGroup ?? item.printTarget)
-      )
+      printDeltaItems.flatMap((item) =>
+        printTargetsFor(item.printGroup ?? item.printTarget)
+      ),
     )
-  ).filter((t) => t !== "none");
+  );
 
   for (const target of printTargets) {
     try {
@@ -1339,7 +1354,7 @@ try {
         tableId,
         target,
         items: printDeltaItems.filter((item) =>
-          normalizePrintTarget(item.printGroup ?? item.printTarget) === target &&
+          shouldPrintToTarget(item, target) &&
           item.shouldPrint !== false
         ),
       });
@@ -1515,14 +1530,16 @@ app.post("/api/rt/tables/:tableId/items", async (req, res) => {
     // RT注文確定時も注文票を自動印刷
     if (shouldPrint !== false) {
       try {
-        await printOrderSlip({
-         tableId,
-          target: normalizedPrintTarget,
-          items: [{
-            ...(store.orderItems.get(canonicalItemId) || {}),
-            quantity: Number(qty ?? 1),
-          }],
-        });
+        for (const target of printTargetsFor(normalizedPrintTarget)) {
+          await printOrderSlip({
+            tableId,
+            target,
+            items: [{
+              ...(store.orderItems.get(canonicalItemId) || {}),
+              quantity: Number(qty ?? 1),
+            }],
+          });
+        }
       } catch (e) {
         console.error("RT AUTO PRINT ORDER ERROR:", e);
       }

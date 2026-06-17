@@ -485,6 +485,12 @@ class _BrandListPageState extends State<BrandListPage> {
                 groupValue: printGroup,
                 onChanged: (v) => setState(() => printGroup = v!),
               ),
+              RadioListTile<String>(
+                title: const Text('厨房・レジ両方'),
+                value: 'both',
+                groupValue: printGroup,
+                onChanged: (v) => setState(() => printGroup = v!),
+              ),
             ],
           );
         },
@@ -549,6 +555,12 @@ class _BrandListPageState extends State<BrandListPage> {
               RadioListTile<String>(
                 title: const Text('レジ（特殊・高額）'),
                 value: 'register',
+                groupValue: printGroup,
+                onChanged: (v) => setState(() => printGroup = v!),
+              ),
+              RadioListTile<String>(
+                title: const Text('厨房・レジ両方'),
+                value: 'both',
                 groupValue: printGroup,
                 onChanged: (v) => setState(() => printGroup = v!),
               ),
