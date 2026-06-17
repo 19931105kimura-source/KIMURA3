@@ -19,6 +19,47 @@ function resolveDataPath(fileName) {
 
 const MENU_PATH = resolveDataPath("menu.json");
 const PRINTER_SETTINGS_PATH = resolveDataPath("printer_settings.json");
+const TABLES_FILE = path.join(__dirname, "data", "tables.json");
+const DEFAULT_TABLES = [
+  "C1", "C2", "C3", "C4",
+  "1", "2", "3", "4", "5", "6", "7",
+  "8", "9", "10", "11", "12", "13", "14",
+  "VA", "VB", "VC",
+];
+
+function normalizeTableName(name) {
+  return String(name ?? "").trim();
+}
+
+function readTables() {
+  try {
+    if (!fs.existsSync(TABLES_FILE)) return [...DEFAULT_TABLES];
+    const raw = fs.readFileSync(TABLES_FILE, "utf8");
+    const json = JSON.parse(raw || "{}");
+    const tables = Array.isArray(json.tables) ? json.tables : [];
+    const normalized = tables
+      .map(normalizeTableName)
+      .filter(Boolean);
+    return normalized.length > 0 ? normalized : [...DEFAULT_TABLES];
+  } catch (e) {
+    console.error("TABLES LOAD ERROR:", e);
+    return [...DEFAULT_TABLES];
+  }
+}
+
+function saveTables(tables) {
+  const normalized = [];
+  for (const table of Array.isArray(tables) ? tables : []) {
+    const name = normalizeTableName(table);
+    if (name && !normalized.includes(name)) normalized.push(name);
+  }
+  fs.writeFileSync(
+    TABLES_FILE,
+    JSON.stringify({ updatedAt: new Date().toISOString(), tables: normalized }, null, 2),
+    "utf8",
+  );
+  return normalized;
+}
 
 function readPrinterSettings() {
   if (!fs.existsSync(PRINTER_SETTINGS_PATH)) {
@@ -1042,6 +1083,78 @@ app.post("/api/other-items", (req, res) => {
 // =========================
 // 宣材（GET/POST）
 // =========================
+// =========================
+// Tables (GET/POST/PATCH/DELETE)
+// =========================
+app.get("/api/tables", (req, res) => {
+  res.json({ tables: readTables() });
+});
+
+app.post("/api/tables", (req, res) => {
+  try {
+    const name = normalizeTableName(req.body?.name);
+    if (!name) {
+      return res.status(400).json({ ok: false, error: "name required" });
+    }
+
+    const tables = readTables();
+    if (!tables.includes(name)) {
+      tables.push(name);
+      saveTables(tables);
+    }
+
+    res.json({ ok: true, tables });
+  } catch (e) {
+    console.error("TABLE ADD ERROR:", e);
+    res.status(500).json({ ok: false, error: "save failed" });
+  }
+});
+
+app.patch("/api/tables/:name", (req, res) => {
+  try {
+    const oldName = normalizeTableName(req.params.name);
+    const newName = normalizeTableName(req.body?.newName);
+    if (!oldName || !newName) {
+      return res.status(400).json({ ok: false, error: "old/new name required" });
+    }
+
+    const tables = readTables();
+    const idx = tables.indexOf(oldName);
+    if (idx === -1) {
+      return res.status(404).json({ ok: false, error: "table not found" });
+    }
+    if (tables.includes(newName) && newName !== oldName) {
+      return res.status(409).json({ ok: false, error: "table already exists" });
+    }
+
+    tables[idx] = newName;
+    saveTables(tables);
+
+    res.json({ ok: true, tables });
+  } catch (e) {
+    console.error("TABLE RENAME ERROR:", e);
+    res.status(500).json({ ok: false, error: "save failed" });
+  }
+});
+
+app.delete("/api/tables/:name", (req, res) => {
+  try {
+    const name = normalizeTableName(req.params.name);
+    if (!name) {
+      return res.status(400).json({ ok: false, error: "name required" });
+    }
+
+    const tables = readTables();
+    const next = tables.filter((table) => table !== name);
+    saveTables(next);
+
+    res.json({ ok: true, tables: next });
+  } catch (e) {
+    console.error("TABLE DELETE ERROR:", e);
+    res.status(500).json({ ok: false, error: "save failed" });
+  }
+});
+
 const PROMOS_FILE = resolveDataPath("promos.json");
 
 app.get("/api/promos", (req, res) => {
