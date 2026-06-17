@@ -116,6 +116,41 @@ class _OwnerDeletedOrdersPageState extends State<OwnerDeletedOrdersPage> {
     }
   }
 
+  Future<void> _deleteAllHistory() async {
+    if (_entries.isEmpty) return;
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('削除履歴をすべて削除しますか？'),
+        content: const Text('すべての削除履歴を完全に削除します。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('キャンセル'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('すべて削除'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+
+    final res = await http.delete(ServerConfig.api('/api/deleted-orders'));
+
+    if (!mounted) return;
+    if (res.statusCode >= 200 && res.statusCode < 300) {
+      await _load();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('削除履歴の一括削除に失敗しました')),
+      );
+    }
+  }
+
   int _total(List<dynamic> lines) {
     var sum = 0;
     for (final line in lines) {
@@ -142,6 +177,12 @@ class _OwnerDeletedOrdersPageState extends State<OwnerDeletedOrdersPage> {
       appBar: AppBar(
         title: const Text('削除履歴'),
         actions: [
+          if (_entries.isNotEmpty)
+            IconButton(
+              tooltip: 'すべて削除',
+              onPressed: _deleteAllHistory,
+              icon: const Icon(Icons.delete_sweep),
+            ),
           IconButton(
             onPressed: _load,
             icon: const Icon(Icons.refresh),

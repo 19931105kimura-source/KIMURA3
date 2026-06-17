@@ -1268,6 +1268,16 @@ app.post("/api/deleted-orders/:id/restore", (req, res) => {
   }
 });
 
+app.delete("/api/deleted-orders", (req, res) => {
+  try {
+    saveDeletedOrders([]);
+    res.json({ ok: true, deletedOrders: [] });
+  } catch (e) {
+    console.error("DELETED ORDER CLEAR ERROR:", e);
+    res.status(500).json({ ok: false, error: "clear failed" });
+  }
+});
+
 app.delete("/api/deleted-orders/:id", (req, res) => {
   try {
     const id = String(req.params.id ?? "");
