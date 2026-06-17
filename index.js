@@ -157,7 +157,17 @@ app.use((err, req, res, next) => {
   }
   next(err);
 });
-app.use(express.static(path.join(__dirname, "public")));
+app.use(
+  express.static(path.join(__dirname, "public"), {
+    etag: false,
+    lastModified: false,
+    setHeaders: (res) => {
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
+    },
+  }),
+);
 
 // uploads を静的配信（/uploads/promos/xxx で見える）
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
@@ -1463,6 +1473,14 @@ app.post("/api/rt/tables/:tableId/items", async (req, res) => {
       return res.status(400).json({ ok: false, error: "table not active" });
     }
 
+    if (
+      store.tableOrders &&
+      typeof store.tableOrders.has === "function" &&
+      !store.tableOrders.has(String(tableId))
+    ) {
+      hydrateRtSnapshotFromDb(tableId);
+    }
+
      const line = store.addTableItem(tableId, {
       productId,
       qty,
@@ -1748,8 +1766,8 @@ app.post("/api/rt/tables/:tableId/start", (req, res) => {
   const { tableId } = req.params;
 
   try {
-    clearTableRuntimeOrders(tableId);
     store.openTable(tableId);   // ★ 正本はサーバー
+    hydrateRtSnapshotFromDb(tableId);
     broadcastSnapshot();        // ★ 全端末に通知
     res.json({ ok: true });
   } catch (e) {
