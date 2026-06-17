@@ -1241,6 +1241,8 @@ if (order == null) {
 
       final targetTable = targetOrder.table;
       _orders.removeAt(targetIndex);
+      _clearRealtimeOrderCacheForTable(targetTable);
+      notifyListeners();
 
       final remainingLinesOnTable = _orders
           .where((o) => o.table == targetTable)
@@ -1269,6 +1271,28 @@ if (order == null) {
         ..addAll(previousOrders);
       notifyListeners();
       return false;
+    }
+  }
+
+  void _clearRealtimeOrderCacheForTable(String table) {
+    final orderIds = realtimeOrdersByTable.remove(table);
+    if (orderIds is List) {
+      for (final orderId in orderIds) {
+        realtimeOrderItems.remove(orderId);
+      }
+    }
+
+    final rt = realtimeTables[table];
+    if (rt is Map<String, dynamic>) {
+      final next = Map<String, dynamic>.from(rt);
+      final rawOrder = next['order'];
+      if (rawOrder is Map) {
+        next['order'] = {
+          ...Map<String, dynamic>.from(rawOrder),
+          'items': <dynamic>[],
+        };
+      }
+      realtimeTables[table] = next;
     }
   }
 
