@@ -24,22 +24,6 @@ class OwnerTableCenterPanel extends StatefulWidget {
 class _OwnerTableCenterPanelState extends State<OwnerTableCenterPanel> {
   bool _printing = false;
 
-  Future<void> _rtRemoveOrderLines(Order order) async {
-    for (final line in order.lines) {
-      final lineId = line.lineId;
-      if (lineId == null) continue;
-      try {
-        final uri = ServerConfig.api('/api/rt/tables/${widget.table}/items/$lineId');
-        final res = await http.delete(uri);
-        if (res.statusCode != 200) {
-          debugPrint('RT DELETE FAILED ${res.statusCode}');
-        }
-      } catch (e) {
-        debugPrint('RT DELETE ERROR: $e');
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final orderState = context.watch<OrderState>();
@@ -335,9 +319,6 @@ class _OwnerTableCenterPanelState extends State<OwnerTableCenterPanel> {
                         final confirmed = await confirmOrderDeletion(context);
                         if (!confirmed || !context.mounted) return;
 
-                        if (orderState.isRealtimeOrderId(orderData.id)) {
-                          await _rtRemoveOrderLines(orderData);
-                        }
                         final ok = await orderState.removeOrder(orderData.id);
                          if (!ok) return;
                         await orderState.endTable(widget.table);
