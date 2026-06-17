@@ -107,7 +107,6 @@ void initState() {
             final hasOrder = orderState.hasOrder(table);
             final order = orderState.realtimeOrderForDisplay(table);
 
-            final timer = orderState.timerOf(table);
 
             final total = order == null
                 ? 0
@@ -122,7 +121,6 @@ void initState() {
               hasOrder: hasOrder,
               total: total,
               editMode: _editMode,
-              timer: timer,
               onTap: () => _openTableDialog(context, table),
               onRename: () => _renameTable(context, table),
               onDelete: hasOrder ? null : () => orderState.removeTable(table),
@@ -199,12 +197,10 @@ class _TableBigNumberCard extends StatelessWidget {
   final bool isActive;
   final bool hasOrder;
   final int total;
- final bool editMode;
-  final TableTimerInfo? timer;
+  final bool editMode;
   final VoidCallback onTap;
   final VoidCallback onRename;
   final VoidCallback? onDelete;
-
 
   const _TableBigNumberCard({
     required this.table,
@@ -212,64 +208,17 @@ class _TableBigNumberCard extends StatelessWidget {
     required this.hasOrder,
     required this.total,
     required this.editMode,
-    required this.timer,
     required this.onTap,
     required this.onRename,
     required this.onDelete,
   });
 
-  String _formatSec(int sec) {
-    final total = sec < 0 ? 0 : sec;
-    final h = total ~/ 3600;
-    final m = (total % 3600) ~/ 60;
-    final s = total % 60;
-
-    if (h > 0) return '${h}時間${m.toString().padLeft(2, '0')}分';
-    return '${m}分${s.toString().padLeft(2, '0')}秒';
-  }
-
-  // ★ 修正：startTimeベースで終了時刻を計算
-  String _formatEndTime(int totalSeconds, String? startTime) {
-    if (startTime == null || startTime.isEmpty) {
-      // startTime未入力のときだけ現在時刻ベースにフォールバック
-      final end = DateTime.now().add(Duration(seconds: totalSeconds));
-      return '${end.hour.toString().padLeft(2, '0')}:${end.minute.toString().padLeft(2, '0')}';
-    }
-
-    final parts = startTime.split(':');
-    if (parts.length != 2) return '--:--';
-
-    final h = int.tryParse(parts[0]) ?? 0;
-    final m = int.tryParse(parts[1]) ?? 0;
-
-    final startMinutes = h * 60 + m;
-    final endMinutes = startMinutes + (totalSeconds ~/ 60);
-
-    final endH = (endMinutes ~/ 60) % 24;
-    final endM = endMinutes % 60;
-
-    return '${endH.toString().padLeft(2, '0')}:${endM.toString().padLeft(2, '0')}';
-  }
-
   @override
   Widget build(BuildContext context) {
-    // ===== ★ 色判定ロジック =====
-    Color borderColor = isActive ? Colors.amber : Colors.grey.shade400;
-    Color bgColor = isActive
+    final borderColor = isActive ? Colors.amber : Colors.grey.shade400;
+    final bgColor = isActive
         ? Colors.amber.withValues(alpha: 0.16)
         : Colors.grey.shade200;
-
-    if (timer != null && !timer!.autoExtend) {
-      final sec = timer!.remainingSeconds;
-
-      if (sec <= 5 * 60) {
-        borderColor = Colors.red.shade900;
-        bgColor = Colors.red.withValues(alpha: 0.30);
-      } else if (sec <= 10 * 60) {
-        borderColor = Colors.red.shade600;
-        bgColor = Colors.red.withValues(alpha: 0.20);
-      }
-    }
 
     return InkWell(
       borderRadius: BorderRadius.circular(18),
@@ -293,48 +242,12 @@ class _TableBigNumberCard extends StatelessWidget {
                     fontSize: 40,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 1.2,
-                    color: hasOrder
-                        ? Colors.amber.shade900
-                        : Colors.black87,
+                    color: hasOrder ? Colors.amber.shade900 : Colors.black87,
                   ),
                 ),
               ),
             ),
-            if (timer != null && !timer!.autoExtend)
-              Align(
-                alignment: Alignment.topRight,
-                child: Padding(
-                  padding: EdgeInsets.only(
-                    top: editMode ? 42 : 6,
-                    right: 6,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '開始 ${timer!.startTime ?? "--:--"}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: borderColor,
-                        ),
-                      ),
-                      Text(
-                        // ★ 修正：startTimeベースで終了時刻を計算
-                        '終了 ${_formatEndTime(timer!.totalSeconds, timer!.startTime)}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: borderColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-           if (isActive && hasOrder)
+            if (isActive && hasOrder)
               Align(
                 alignment: Alignment.center,
                 child: Text(
@@ -351,34 +264,15 @@ class _TableBigNumberCard extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.only(bottom: 6),
                 child: isActive
-                    ? Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            '使用中',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w800,
-                              color: borderColor,
-                            ),
-                          ),
-
-                          // ★ 残り時間（あるときだけ表示）
-                          if (timer != null && !timer!.autoExtend)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 2),
-                              child: Text(
-                                _formatSec(timer!.remainingSeconds),
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w900,
-                                  color: borderColor,
-                                ),
-                              ),
-                            ),
-                        ],
+                    ? Text(
+                        '???',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          color: borderColor,
+                        ),
                       )
                     : const Text(
-                        '空席',
+                        '??',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
@@ -394,12 +288,12 @@ class _TableBigNumberCard extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
-                      tooltip: '名前変更',
+                      tooltip: '????',
                       icon: const Icon(Icons.edit),
                       onPressed: onRename,
                     ),
                     IconButton(
-                      tooltip: hasOrder ? '注文ありは削除不可' : '削除',
+                      tooltip: hasOrder ? '?????????' : '??',
                       icon: Icon(
                         Icons.delete,
                         color: hasOrder ? Colors.grey : Colors.red,
@@ -408,8 +302,8 @@ class _TableBigNumberCard extends StatelessWidget {
                     ),
                   ],
                 ),
-          ),
-           ],
+              ),
+          ],
         ),
       ),
     );
