@@ -459,7 +459,7 @@ Order? _buildRealtimeOrder(String table) {
     final rawBrand = (it['brand'] ?? '').toString().trim();
     final rawCategory = (it['category'] ?? '').toString().trim();
 
-    final label = name.isNotEmpty ? name : rawLabel;
+    final label = rawLabel.isNotEmpty ? rawLabel : name;
     if (label.isEmpty) continue;
 
     final brand = rawBrand == 'RT' ? '' : rawBrand;

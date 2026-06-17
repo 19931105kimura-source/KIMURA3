@@ -1242,7 +1242,7 @@ app.post("/api/deleted-orders/:id/restore", (req, res) => {
       const qty = Number(line.qty ?? line.quantity ?? 0);
       if (!Number.isFinite(qty) || qty <= 0) continue;
       store.addTableItemSnapshot(targetTable, {
-        name: line.brand || line.name || line.label || "",
+        name: line.name || line.label || line.brand || "",
         label: line.label || line.name || "",
         brand: line.brand || "",
         category: line.category || "",
