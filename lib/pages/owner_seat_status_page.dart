@@ -23,7 +23,7 @@ class OwnerSeatStatusPage extends StatelessWidget {
         elevation: 0,
         backgroundColor: _bgTop,
         title: Text(
-          '??????${activeTables.length}?',
+          '使用中の席（${activeTables.length}）',
           style: const TextStyle(
             fontWeight: FontWeight.w900,
             letterSpacing: 0.8,
@@ -41,7 +41,7 @@ class OwnerSeatStatusPage extends StatelessWidget {
         child: activeTables.isEmpty
             ? const Center(
                 child: Text(
-                  '?????????????',
+                  '現在使用中の席はありません',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
@@ -94,7 +94,7 @@ class OwnerSeatStatusPage extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '? $table',
+                            '席 $table',
                             style: const TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.w900,
@@ -104,7 +104,7 @@ class OwnerSeatStatusPage extends StatelessWidget {
                           ),
                           const Spacer(),
                           Text(
-                            '????',
+                            '会計金額',
                             style: TextStyle(
                               fontSize: 13,
                               color: Colors.white.withValues(alpha: 0.74),
