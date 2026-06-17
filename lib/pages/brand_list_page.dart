@@ -302,8 +302,51 @@ class _BrandListPageState extends State<BrandListPage> {
 
                               return ListTile(
                                 key: ValueKey(v),
-                                 title: Text(v['label']),
-                                subtitle: Text(formatYen(v['price'])),
+                                title: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    SizedBox(
+                                      width: 280,
+                                      child: Text(
+                                        v['label'],
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    SizedBox(
+                                      width: 120,
+                                      child: Text(formatYen(v['price'])),
+                                    ),
+                                    PopupMenuButton<String>(
+                                      onSelected: (val) {
+                                        if (val == 'edit') {
+                                          _editVariant(context, v);
+                                        } else if (val == 'delete') {
+                                          menuData.removeVariant(
+                                              selectedBrand!, v);
+                                        }
+                                      },
+                                      itemBuilder: (_) => const [
+                                        PopupMenuItem(
+                                          value: 'edit',
+                                          child: Text('\u7de8\u96c6'),
+                                        ),
+                                        PopupMenuItem(
+                                          value: 'delete',
+                                          child: Text(
+                                            '\u524a\u9664',
+                                            style: TextStyle(
+                                                color: Colors.red),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    ReorderableDragStartListener(
+                                      index: index,
+                                      child: const Icon(Icons.drag_handle),
+                                    ),
+                                  ],
+                                ),
                                 onTap: () {
                                   showModalBottomSheet(
                                     context: context,
@@ -313,41 +356,6 @@ class _BrandListPageState extends State<BrandListPage> {
                                     ),
                                   );
                                 },
-                                trailing: Padding(
-                                  padding: const EdgeInsets.only(right: 24),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      PopupMenuButton<String>(
-                                        onSelected: (val) {
-                                          if (val == 'edit') {
-                                            _editVariant(context, v);
-                                          } else if (val == 'delete') {
-                                            menuData.removeVariant(
-                                                selectedBrand!, v);
-                                          }
-                                        },
-                                        itemBuilder: (_) => const [
-                                          PopupMenuItem(
-                                              value: 'edit',
-                                              child: Text('編集')),
-                                          PopupMenuItem(
-                                            value: 'delete',
-                                            child: Text(
-                                              '削除',
-                                              style: TextStyle(
-                                                  color: Colors.red),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      ReorderableDragStartListener(
-                                        index: index,
-                                        child: const Icon(Icons.drag_handle),
-                                      ),
-                                    ],
-                                  ),
-                                ),
                               );
                             },
                           )
