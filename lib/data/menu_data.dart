@@ -8,12 +8,16 @@ class MenuData extends ChangeNotifier {
   static const String fixedEtcCategory = 'etc';
   String normalizePrintGroup(String? value) {
     final raw = (value ?? '').toLowerCase();
+    if (raw == 'none') return 'none';
     if (raw == 'both') return 'both';
     if (raw == 'register' || raw == 'food') return 'register';
     if (raw == 'kitchen' || raw == 'drink') return 'kitchen';
     return 'kitchen';
   }
   int _saveToken = 0;
+  bool _saving = false;
+  bool _saveAgainRequested = false;
+  Completer<void>? _saveDone;
 
   void _markChangedAndSave() {
     notifyListeners();
@@ -154,13 +158,41 @@ void reorderVariants(
 
   MenuData() {
     items = _deepCopy(_defaultItems);
-    load();
   }
 
   // =========================
   // サーバー保存
   // =========================
-  Future<void> save() async {
+  Future<void> save() {
+  if (_saving) {
+    _saveAgainRequested = true;
+    return _saveDone?.future ?? Future.value();
+  }
+
+  final done = Completer<void>();
+  _saveDone = done;
+  _runSaveLoop(done);
+  return done.future;
+}
+
+Future<void> _runSaveLoop(Completer<void> done) async {
+  _saving = true;
+  try {
+    do {
+      _saveAgainRequested = false;
+      await _saveOnce();
+    } while (_saveAgainRequested);
+
+    if (!done.isCompleted) done.complete();
+  } catch (e, st) {
+    if (!done.isCompleted) done.completeError(e, st);
+  } finally {
+    _saving = false;
+    if (_saveDone == done) _saveDone = null;
+  }
+}
+
+  Future<void> _saveOnce() async {
   debugPrint('=== SAVE CALLED ===');
 
   try {
