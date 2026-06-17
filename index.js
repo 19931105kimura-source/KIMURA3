@@ -20,6 +20,7 @@ function resolveDataPath(fileName) {
 const MENU_PATH = resolveDataPath("menu.json");
 const PRINTER_SETTINGS_PATH = resolveDataPath("printer_settings.json");
 const TABLES_FILE = path.join(__dirname, "data", "tables.json");
+const DELETED_ORDERS_FILE = path.join(__dirname, "data", "deleted_orders.json");
 const DEFAULT_TABLES = [
   "C1", "C2", "C3", "C4",
   "1", "2", "3", "4", "5", "6", "7",
@@ -59,6 +60,31 @@ function saveTables(tables) {
     "utf8",
   );
   return normalized;
+}
+
+function readDeletedOrders() {
+  try {
+    if (!fs.existsSync(DELETED_ORDERS_FILE)) return [];
+    const raw = fs.readFileSync(DELETED_ORDERS_FILE, "utf8");
+    const json = JSON.parse(raw || "{}");
+    return Array.isArray(json.deletedOrders) ? json.deletedOrders : [];
+  } catch (e) {
+    console.error("DELETED ORDERS LOAD ERROR:", e);
+    return [];
+  }
+}
+
+function saveDeletedOrders(deletedOrders) {
+  const safe = Array.isArray(deletedOrders) ? deletedOrders : [];
+  fs.writeFileSync(
+    DELETED_ORDERS_FILE,
+    JSON.stringify({ updatedAt: new Date().toISOString(), deletedOrders: safe }, null, 2),
+    "utf8",
+  );
+}
+
+function makeDeletedOrderId() {
+  return `del_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
 }
 
 function readPrinterSettings() {
@@ -1152,6 +1178,106 @@ app.delete("/api/tables/:name", (req, res) => {
   } catch (e) {
     console.error("TABLE DELETE ERROR:", e);
     res.status(500).json({ ok: false, error: "save failed" });
+  }
+});
+
+// =========================
+// Deleted order history
+// =========================
+app.get("/api/deleted-orders", (req, res) => {
+  res.json({ deletedOrders: readDeletedOrders() });
+});
+
+app.post("/api/deleted-orders/archive", (req, res) => {
+  try {
+    const table = normalizeTableName(req.body?.table);
+    const lines = Array.isArray(req.body?.lines) ? req.body.lines : [];
+    if (!table || lines.length === 0) {
+      return res.status(400).json({ ok: false, error: "table and lines required" });
+    }
+
+    const entry = {
+      id: makeDeletedOrderId(),
+      originalOrderId: String(req.body?.orderId ?? ""),
+      originalTable: table,
+      deletedAt: new Date().toISOString(),
+      restoredAt: null,
+      restoredToTable: null,
+      lines,
+    };
+
+    const deletedOrders = readDeletedOrders();
+    deletedOrders.unshift(entry);
+    saveDeletedOrders(deletedOrders);
+
+    res.json({ ok: true, entry });
+  } catch (e) {
+    console.error("DELETED ORDER ARCHIVE ERROR:", e);
+    res.status(500).json({ ok: false, error: "archive failed" });
+  }
+});
+
+app.post("/api/deleted-orders/:id/restore", (req, res) => {
+  try {
+    const id = String(req.params.id ?? "");
+    const targetTable = normalizeTableName(req.body?.table);
+    if (!id || !targetTable) {
+      return res.status(400).json({ ok: false, error: "id and table required" });
+    }
+
+    const deletedOrders = readDeletedOrders();
+    const entry = deletedOrders.find((item) => item.id === id);
+    if (!entry) {
+      return res.status(404).json({ ok: false, error: "history not found" });
+    }
+    if (entry.restoredAt) {
+      return res.status(409).json({ ok: false, error: "already restored" });
+    }
+
+    store.openTable(targetTable);
+    hydrateRtSnapshotFromDb(targetTable);
+
+    const lines = Array.isArray(entry.lines) ? entry.lines : [];
+    for (const line of lines) {
+      const qty = Number(line.qty ?? line.quantity ?? 0);
+      if (!Number.isFinite(qty) || qty <= 0) continue;
+      store.addTableItemSnapshot(targetTable, {
+        name: line.brand || line.name || line.label || "",
+        label: line.label || line.name || "",
+        brand: line.brand || "",
+        category: line.category || "",
+        section: line.section ?? null,
+        subCategory: line.subCategory || "",
+        printGroup: normalizePrintTarget(line.printGroup ?? "kitchen"),
+        price: Number(line.price ?? 0),
+        qty,
+        addedBy: "owner",
+      });
+    }
+
+    persistRtTableToDb(targetTable, { orderedBy: "owner" });
+    entry.restoredAt = new Date().toISOString();
+    entry.restoredToTable = targetTable;
+    saveDeletedOrders(deletedOrders);
+    broadcastSnapshot();
+
+    res.json({ ok: true, entry });
+  } catch (e) {
+    console.error("DELETED ORDER RESTORE ERROR:", e);
+    res.status(500).json({ ok: false, error: "restore failed" });
+  }
+});
+
+app.delete("/api/deleted-orders/:id", (req, res) => {
+  try {
+    const id = String(req.params.id ?? "");
+    const deletedOrders = readDeletedOrders();
+    const next = deletedOrders.filter((item) => item.id !== id);
+    saveDeletedOrders(next);
+    res.json({ ok: true, deletedOrders: next });
+  } catch (e) {
+    console.error("DELETED ORDER DELETE ERROR:", e);
+    res.status(500).json({ ok: false, error: "delete failed" });
   }
 });
 

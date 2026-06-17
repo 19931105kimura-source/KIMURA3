@@ -1211,7 +1211,7 @@ if (order == null) {
     notifyListeners();
   }
 
- Future<bool> removeOrder(String orderId) async {
+  Future<bool> removeOrder(String orderId) async {
     final targetIndex = _orders.indexWhere((o) => o.id == orderId);
     if (targetIndex == -1) return false;
     final previousOrders = _orders
@@ -1227,6 +1227,11 @@ if (order == null) {
     final isRealtimeOrder = isRealtimeOrderId(targetOrder.id);
     var rtDeleteSucceeded = !isRealtimeOrder;
     try {
+      final archived = await _archiveDeletedOrder(targetOrder);
+      if (!archived) {
+        throw Exception('archive deleted order failed');
+      }
+
       if (isRealtimeOrder) {
         rtDeleteSucceeded = await _deleteRealtimeLinesOnServer(
           targetOrder.table,
@@ -1263,6 +1268,26 @@ if (order == null) {
         ..clear()
         ..addAll(previousOrders);
       notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> _archiveDeletedOrder(Order order) async {
+    try {
+      final uri = ServerConfig.api('/api/deleted-orders/archive');
+      final res = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'orderId': order.id,
+          'table': order.table,
+          'createdAt': order.createdAt.toIso8601String(),
+          'lines': order.lines.map((line) => line.toJson()).toList(),
+        }),
+      );
+      return res.statusCode >= 200 && res.statusCode < 300;
+    } catch (e) {
+      debugPrint('ARCHIVE DELETED ORDER ERROR: $e');
       return false;
     }
   }

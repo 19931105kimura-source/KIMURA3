@@ -11,6 +11,7 @@ import 'set_edit_page.dart';
 import 'owner_other_item_edit_page.dart'; // ✅ 追加
 import 'owner_printer_settings.dart';
 import 'owner_seat_status_page.dart';
+import 'owner_deleted_orders_page.dart';
 
 
 class OwnerHomePage extends StatelessWidget {
@@ -193,9 +194,17 @@ _MenuCard(
   },
 ),
 
-             
-             
-             
+       _MenuCard(
+  icon: Icons.restore,
+  title: '削除履歴',
+  onTap: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const OwnerDeletedOrdersPage()),
+    );
+  },
+),
+
               ],
 
             );
