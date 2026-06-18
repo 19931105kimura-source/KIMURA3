@@ -116,7 +116,7 @@ class OwnerHomePage extends StatelessWidget {
                 ),
                 _MenuCard(
                   icon: Icons.receipt_long,
-                  title: '????',
+                  title: '席の会計',
                   onTap: () {
                     Navigator.push(
                       context,
