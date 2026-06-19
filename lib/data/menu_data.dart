@@ -274,7 +274,6 @@ Future<void> _runSaveLoop(Completer<bool> done) async {
 
     items = grouped.values.toList();
 
-    debugPrint('MENU ITEMS: $items');
     notifyListeners();
   } catch (e, st) {
     debugPrint('Menu load exception: $e');

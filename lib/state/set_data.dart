@@ -19,11 +19,13 @@ class SetData extends ChangeNotifier {
   // ロード（最重要）
   // =========================
   Future<void> load() async {
-    await _loadFromLocal();
-    await _loadFromServer();
+    final loadedFromServer = await _loadFromServer();
+    if (!loadedFromServer) {
+      await _loadFromLocal();
+    }
     _ensureFixedSets();
     notifyListeners();
-    await save();
+    await _saveLocal();
   }
 
   // =========================
@@ -60,10 +62,10 @@ class SetData extends ChangeNotifier {
   // -------------------------
   // サーバー
   // -------------------------
-  Future<void> _loadFromServer() async {
+  Future<bool> _loadFromServer() async {
     try {
       final res = await http.get(ServerConfig.api('/api/sets'));
-      if (res.statusCode != 200) return;
+      if (res.statusCode != 200) return false;
 
       final decoded = jsonDecode(res.body);
       final list =
@@ -72,8 +74,9 @@ class SetData extends ChangeNotifier {
       _sets
         ..clear()
         ..addAll(list);
+      return true;
     } catch (_) {
-      // 無視
+      return false;
     }
   }
 

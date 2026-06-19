@@ -722,9 +722,6 @@ if (removed === 0) {
   }
   
   moveTableOrderSnapshot(from, to) {
-    console.log('--- MOVE START ---', { from, to });
-  console.log('BEFORE fromSnap', this.getTableOrderSnapshot(from));
-  console.log('BEFORE toSnap', this.getTableOrderSnapshot(to));
     const fromKey = String(from);
     const toKey = String(to);
     if (fromKey === toKey) return;
@@ -772,9 +769,6 @@ if (removed === 0) {
     });
     fromTable.status = TABLE_STATUS.closed;
     fromTable.closedAt = nowIso();
-     console.log('AFTER fromSnap', this.getTableOrderSnapshot(from));
-  console.log('AFTER toSnap', this.getTableOrderSnapshot(to));
-  console.log('--- MOVE END ---');
   }
 
   mergeTableOrderSnapshot(from, to) {

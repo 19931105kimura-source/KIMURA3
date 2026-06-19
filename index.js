@@ -1402,7 +1402,6 @@ app.post("/api/promos/delete-file", (req, res) => {
 // 注文確定（最小・ダミー）
 // =========================
  app.post("/api/orders",  async(req, res) => {
-  console.log("ORDER RECEIVED", req.body);
 
   const requestId = String(req.body.requestId ?? "").trim();
   if (requestId) {

@@ -21,17 +21,8 @@ class CastDrinkData extends ChangeNotifier {
   // 保存
   // =========================
   Future<void> save() async {
-  final prefs = await SharedPreferences.getInstance();
-
-  final data = _items.map((e) => {
-    'name': e.name,
-    'price': e.price,
-    'strengths': e.strengths,
-  }).toList();
-
-  await prefs.setString(_storageKey, jsonEncode(data));
-
-  await saveToServer(); // ★ これを追加
+    await _saveLocal();
+    await saveToServer();
 }
 
 
@@ -39,29 +30,48 @@ class CastDrinkData extends ChangeNotifier {
   // 読み込み
   // =========================
   Future<void> load() async {
-  // ① まずサーバーから読む
-  await loadFromServer();
+    final loadedFromServer = await loadFromServer();
+    if (loadedFromServer) {
+      await _saveLocal();
+      return;
+    }
 
-  final prefs = await SharedPreferences.getInstance();
-  final json = prefs.getString(_storageKey);
-  if (json == null) return;
-
-  final List list = jsonDecode(json);
-  _items
-    ..clear()
-    ..addAll(
-      list.map(
-        (e) => CastDrinkItem(
-          name: e['name'],
-          price: e['price'],
-          strengths: List<String>.from(e['strengths']),
-        ),
-      ),
-    );
-
-  notifyListeners();
+    await _loadLocal();
+    notifyListeners();
 }
 
+  Future<void> _loadLocal() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_storageKey);
+    if (raw == null) return;
+
+    try {
+      final List list = jsonDecode(raw);
+      _items
+        ..clear()
+        ..addAll(
+          list.map(
+            (e) => CastDrinkItem(
+              name: e['name'],
+              price: e['price'],
+              strengths: List<String>.from(e['strengths']),
+            ),
+          ),
+        );
+    } catch (e) {
+      debugPrint('CastDrink local load error: $e');
+    }
+  }
+
+  Future<void> _saveLocal() async {
+    final prefs = await SharedPreferences.getInstance();
+    final data = _items.map((e) => {
+      'name': e.name,
+      'price': e.price,
+      'strengths': e.strengths,
+    }).toList();
+    await prefs.setString(_storageKey, jsonEncode(data));
+  }
 
   // =========================
   // ドリンク追加
@@ -172,12 +182,12 @@ class CastDrinkData extends ChangeNotifier {
     debugPrint('CastDrink server save error: $e');
   }
 }
-Future<void> loadFromServer() async {
+Future<bool> loadFromServer() async {
   try {
     final uri = ServerConfig.api('/api/cast-drinks');
     final res = await http.get(uri);
 
-    if (res.statusCode != 200) return;
+    if (res.statusCode != 200) return false;
 
     final List list = jsonDecode(res.body);
 
@@ -194,8 +204,10 @@ Future<void> loadFromServer() async {
       );
 
     notifyListeners();
+    return true;
   } catch (e) {
     debugPrint('CastDrink loadFromServer error: $e');
+    return false;
   }
 }
 

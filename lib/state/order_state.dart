@@ -354,9 +354,7 @@ Map<String, dynamic> realtimeTables = {};
   /// ★ テーブルごとのタイマー情報
   final Map<String, TableTimerInfo> tableTimers = {};
 
-  OrderState() {
-    load();
-  }
+  OrderState();
 
    // ===================
 // ★ Realtime 用：席ごとの注文明細数
@@ -1573,8 +1571,6 @@ if (order == null) {
         rethrow;
       }
 
-      debugPrint('REQ /api/orders payload=$body');
-
       final res = await http.post(
         uri,
         headers: {'Content-Type': 'application/json'},
@@ -1582,7 +1578,6 @@ if (order == null) {
       );
 
       debugPrint('RES /api/orders status=${res.statusCode}');
-      debugPrint('RES /api/orders body=${res.body}');
 
      if (res.statusCode != 200) {
         _lastSubmitError = 'server_rejected';

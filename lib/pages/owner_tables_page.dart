@@ -33,11 +33,6 @@ void initState() {
   Widget build(BuildContext context) {
     final orderState = context.watch<OrderState>();
     final tables = orderState.tables;
-    final realtime = context.watch<RealtimeState>();
-
-    print('RT ordersByTable = ${orderState.realtimeOrdersByTable}');
-    print('RT orderItems    = ${orderState.realtimeOrderItems}');
-    print('OWNER SNAPSHOT tables = ${realtime.tables}');
 
     return Scaffold(
       appBar: AppBar(

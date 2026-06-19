@@ -28,13 +28,15 @@ class OtherItemData extends ChangeNotifier {
   // ロード（最重要）␊
   // =====================␊
   Future<void> load() async {
-    await _loadFromLocal();
-    await _loadFromServer();
+    final loadedFromServer = await _loadFromServer();
+    if (!loadedFromServer) {
+      await _loadFromLocal();
+    }
     if (items.isEmpty) {
-    items = _deepCopy(_defaultItems);
-  }
+      items = _deepCopy(_defaultItems);
+    }
     notifyListeners();
-    await save();
+    await _saveLocal();
   }
 
   // =====================␊
@@ -71,21 +73,20 @@ class OtherItemData extends ChangeNotifier {
   // ---------------------␊
   // サーバー␊
   // ---------------------␊
-  Future<void> _loadFromServer() async {
+  Future<bool> _loadFromServer() async {
     try {
       final res =
           await http.get(ServerConfig.api('/api/other-items'));
-      if (res.statusCode != 200) return;
+      if (res.statusCode != 200) return false;
 
       final decoded = jsonDecode(res.body);
       final list =
           List<Map<String, dynamic>>.from(decoded['items'] ?? []);
 
-      if (list.isNotEmpty) {
-        items = list;
-      }
+      items = list;
+      return true;
     } catch (_) {
-      // 失敗しても落とさない␊
+      return false;
     }
   }
 
