@@ -17,7 +17,7 @@ class MenuData extends ChangeNotifier {
   int _saveToken = 0;
   bool _saving = false;
   bool _saveAgainRequested = false;
-  Completer<void>? _saveDone;
+  Completer<bool>? _saveDone;
 
   void _markChangedAndSave() {
     notifyListeners();
@@ -28,7 +28,10 @@ class MenuData extends ChangeNotifier {
     final token = ++_saveToken;
     Future<void>.delayed(const Duration(milliseconds: 300), () async {
       if (token != _saveToken) return;
-      await save();
+      final saved = await save();
+      if (!saved) {
+        debugPrint('Menu auto-save failed');
+      }
     });
   }
 
@@ -163,36 +166,40 @@ void reorderVariants(
   // =========================
   // サーバー保存
   // =========================
-  Future<void> save() {
+  Future<bool> save() {
+  _saveToken++;
   if (_saving) {
     _saveAgainRequested = true;
-    return _saveDone?.future ?? Future.value();
+    return _saveDone?.future ?? Future.value(false);
   }
 
-  final done = Completer<void>();
+  final done = Completer<bool>();
   _saveDone = done;
   _runSaveLoop(done);
   return done.future;
 }
 
-Future<void> _runSaveLoop(Completer<void> done) async {
+Future<void> _runSaveLoop(Completer<bool> done) async {
   _saving = true;
+  var saved = false;
   try {
     do {
       _saveAgainRequested = false;
-      await _saveOnce();
+      saved = await _saveOnce();
     } while (_saveAgainRequested);
 
-    if (!done.isCompleted) done.complete();
+    if (!done.isCompleted) done.complete(saved);
   } catch (e, st) {
-    if (!done.isCompleted) done.completeError(e, st);
+    debugPrint('Menu save loop exception: $e');
+    debugPrint('$st');
+    if (!done.isCompleted) done.complete(false);
   } finally {
     _saving = false;
     if (_saveDone == done) _saveDone = null;
   }
 }
 
-  Future<void> _saveOnce() async {
+  Future<bool> _saveOnce() async {
   debugPrint('=== SAVE CALLED ===');
 
   try {
@@ -210,13 +217,14 @@ Future<void> _runSaveLoop(Completer<void> done) async {
 
     if (res.statusCode != 200) {
       debugPrint('Menu save failed: ${res.statusCode}');
-      return;
+      return false;
     }
 
     debugPrint('Menu saved to server');
-    // ★ ここでは load() しない
+    return true;
   } catch (e) {
     debugPrint('Menu save exception: $e');
+    return false;
   }
 }
 

@@ -353,6 +353,13 @@ persistNormalizedOrderToDb({ orderId, tableId, orderedBy, orderedAt, items }) {
     tx();
   }
 
+  clearTableItemsInDb(tableId) {
+    db.prepare(`
+      DELETE FROM orders
+      WHERE table_id = ?
+    `).run(String(tableId));
+  }
+
   // ---------- Snapshot（既存・会計用） ----------
   getTableSnapshot(tableId) {
     const table = this.getTable(tableId);

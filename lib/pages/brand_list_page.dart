@@ -578,17 +578,23 @@ class _BrandListPageState extends State<BrandListPage> {
       ),
       actions: [
         ElevatedButton(
-          onPressed: () {
+          onPressed: () async {
             final price = int.tryParse(priceCtrl.text) ?? 0;
-             final menu = context.read<MenuData>(); // ← ★これを必ず入れる
-            context.read<MenuData>().updateVariant(
+            final menu = context.read<MenuData>();
+            menu.updateVariant(
               v,
               nameCtrl.text,
               price,
-              printGroup: printGroup, // ★ 追加
+              printGroup: printGroup,
             );
-             menu.save(); 
+            final saved = await menu.save();
+            if (!context.mounted) return;
             Navigator.pop(context);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(saved ? '保存しました' : '保存に失敗しました'),
+              ),
+            );
           },
           child: const Text('保存'),
         ),

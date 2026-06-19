@@ -41,9 +41,14 @@ class OwnerCategoryPage extends StatelessWidget {
           // =========================
           TextButton(
             onPressed: () async {
-              await context.read<MenuData>().save();
+              final saved = await context.read<MenuData>().save();
+              if (!context.mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('保存しました')),
+                SnackBar(
+                  content: Text(
+                    saved ? '保存しました' : '保存に失敗しました',
+                  ),
+                ),
               );
             },
             child: const Text(

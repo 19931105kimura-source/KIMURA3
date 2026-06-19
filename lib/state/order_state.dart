@@ -576,32 +576,6 @@ Order? _buildRealtimeOrder(String table) {
     }
   }
 
-  Future<bool> _deleteRealtimeLinesOnServer(String table, List<OrderLine> lines) async {
-    final targets = lines
-        .map((line) => line.lineId)
-        .whereType<String>()
-        .where((id) => id.isNotEmpty)
-        .toSet();
-
-    if (targets.isEmpty) return true;
-
-    var allSucceeded = true;
-    for (final lineId in targets) {
-      try {
-        final uri = ServerConfig.api('/api/rt/tables/$table/items/$lineId');
-        final res = await http.delete(uri);
-        if (res.statusCode < 200 || res.statusCode >= 300) {
-          allSucceeded = false;
-        }
-      } catch (_) {
-        allSucceeded = false;
-      }
-    }
-
-    return allSucceeded;
-  }
-
-
 // int変換（nullや文字でも落ちないように）
 int _toInt(dynamic v) {
   if (v is int) return v;
@@ -1214,62 +1188,40 @@ if (order == null) {
   Future<bool> removeOrder(String orderId) async {
     final targetIndex = _orders.indexWhere((o) => o.id == orderId);
     if (targetIndex == -1) return false;
-    final previousOrders = _orders
-        .map((o) => Order(
-              id: o.id,
-              table: o.table,
-              createdAt: o.createdAt,
-              lines: List<OrderLine>.from(o.lines),
-            ))
-        .toList();
 
     final targetOrder = _orders[targetIndex];
-    final isRealtimeOrder = isRealtimeOrderId(targetOrder.id);
-    var rtDeleteSucceeded = !isRealtimeOrder;
+    String? archivedHistoryId;
+    var serverDeleteCommitted = false;
     try {
-      final archived = await _archiveDeletedOrder(targetOrder);
-      if (!archived) {
+      archivedHistoryId = await _archiveDeletedOrder(targetOrder);
+      if (archivedHistoryId == null) {
         throw Exception('archive deleted order failed');
       }
 
-      if (isRealtimeOrder) {
-        rtDeleteSucceeded = await _deleteRealtimeLinesOnServer(
-          targetOrder.table,
-          targetOrder.lines,
-        );
-      }
-
       final targetTable = targetOrder.table;
-      _orders.removeAt(targetIndex);
-      _clearRealtimeOrderCacheForTable(targetTable);
-      notifyListeners();
-
       final remainingLinesOnTable = _orders
-          .where((o) => o.table == targetTable)
+          .where((o) => o.id != targetOrder.id && o.table == targetTable)
           .expand((o) => o.lines)
           .toList();
 
-      var syncFailed = false;
+      await _syncTableLinesToServer(targetTable, remainingLinesOnTable);
+
+      serverDeleteCommitted = true;
+      _orders.removeAt(targetIndex);
+      _clearRealtimeOrderCacheForTable(targetTable);
+
       try {
-        await _syncTableLinesToServer(targetTable, remainingLinesOnTable);
-      } catch (_) {
-        syncFailed = true;
+        await _save();
+      } catch (e) {
+        debugPrint('ORDER LOCAL SAVE ERROR AFTER SERVER DELETE: $e');
       }
-
-      // RT 削除が実際に成功していれば snapshot 反映で整合が戻るため、
-      // sync-table 失敗を致命扱いにしない。
-      if (syncFailed && !rtDeleteSucceeded) {
-        throw Exception('sync-table failed after local removal');
-      }
-
-      await _save();
       notifyListeners();
       return true;
-    } catch (_) {
-      _orders
-        ..clear()
-        ..addAll(previousOrders);
-      notifyListeners();
+    } catch (e) {
+      debugPrint('REMOVE ORDER ERROR: $e');
+      if (!serverDeleteCommitted && archivedHistoryId != null) {
+        await _deleteArchivedOrderHistory(archivedHistoryId);
+      }
       return false;
     }
   }
@@ -1296,7 +1248,7 @@ if (order == null) {
     }
   }
 
-  Future<bool> _archiveDeletedOrder(Order order) async {
+  Future<String?> _archiveDeletedOrder(Order order) async {
     try {
       final uri = ServerConfig.api('/api/deleted-orders/archive');
       final res = await http.post(
@@ -1309,10 +1261,26 @@ if (order == null) {
           'lines': order.lines.map((line) => line.toJson()).toList(),
         }),
       );
-      return res.statusCode >= 200 && res.statusCode < 300;
+      if (res.statusCode < 200 || res.statusCode >= 300) return null;
+
+      final body = jsonDecode(res.body);
+      final entry = body is Map<String, dynamic> ? body['entry'] : null;
+      if (entry is! Map) return null;
+      final id = entry['id']?.toString();
+      return id == null || id.isEmpty ? null : id;
     } catch (e) {
       debugPrint('ARCHIVE DELETED ORDER ERROR: $e');
-      return false;
+      return null;
+    }
+  }
+
+  Future<void> _deleteArchivedOrderHistory(String id) async {
+    try {
+      final encoded = Uri.encodeComponent(id);
+      final uri = ServerConfig.api('/api/deleted-orders/$encoded');
+      await http.delete(uri);
+    } catch (e) {
+      debugPrint('ROLLBACK DELETED ORDER HISTORY ERROR: $e');
     }
   }
 

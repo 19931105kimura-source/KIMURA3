@@ -756,6 +756,9 @@ app.post("/api/menu", (req, res) => {
 
 function replaceTableItems(tableId, rawLines) {
   if (!Array.isArray(rawLines) || rawLines.length === 0) {
+    if (typeof store.clearTableItemsInDb === "function") {
+      store.clearTableItemsInDb(tableId);
+    }
     clearTableRuntimeOrders(tableId);
     return { orderId: null, itemCount: 0 };
   }
@@ -799,6 +802,9 @@ function replaceTableItems(tableId, rawLines) {
   });
 
   if (normalizedItems.length === 0) {
+    if (typeof store.clearTableItemsInDb === "function") {
+      store.clearTableItemsInDb(tableId);
+    }
     clearTableRuntimeOrders(tableId);
     return { orderId: null, itemCount: 0 };
   }
@@ -880,6 +886,13 @@ function persistRtTableToDb(tableId, { orderedBy = "owner" } = {}) {
       };
     })
     .filter(Boolean);
+
+  if (normalizedItems.length === 0) {
+    if (typeof store.clearTableItemsInDb === "function") {
+      store.clearTableItemsInDb(tableId);
+    }
+    return;
+  }
 
   const orderId = `rt_sync_${String(tableId)}_${Date.now()}`;
   store.replaceTableItemsInDb({
@@ -1218,6 +1231,8 @@ app.post("/api/deleted-orders/archive", (req, res) => {
 });
 
 app.post("/api/deleted-orders/:id/restore", (req, res) => {
+  let rollbackState = null;
+  let rollbackTableId = null;
   try {
     const id = String(req.params.id ?? "");
     const targetTable = normalizeTableName(req.body?.table);
@@ -1233,6 +1248,16 @@ app.post("/api/deleted-orders/:id/restore", (req, res) => {
     if (entry.restoredAt) {
       return res.status(409).json({ ok: false, error: "already restored" });
     }
+
+    rollbackState = {
+      table: store.tables.has(targetTable)
+        ? { ...store.tables.get(targetTable) }
+        : null,
+      lines: typeof store.getTableItemsFromDb === "function"
+        ? store.getTableItemsFromDb(targetTable)
+        : [],
+    };
+    rollbackTableId = targetTable;
 
     store.openTable(targetTable);
     hydrateRtSnapshotFromDb(targetTable);
@@ -1260,10 +1285,24 @@ app.post("/api/deleted-orders/:id/restore", (req, res) => {
     entry.restoredToTable = targetTable;
     saveDeletedOrders(deletedOrders);
     broadcastSnapshot();
+    rollbackState = null;
 
     res.json({ ok: true, entry });
   } catch (e) {
     console.error("DELETED ORDER RESTORE ERROR:", e);
+    if (rollbackState) {
+      try {
+        replaceTableItems(rollbackTableId, rollbackState.lines);
+        if (rollbackState.table) {
+          store.tables.set(rollbackTableId, rollbackState.table);
+        } else {
+          store.tables.delete(rollbackTableId);
+        }
+        broadcastSnapshot();
+      } catch (rollbackError) {
+        console.error("DELETED ORDER RESTORE ROLLBACK ERROR:", rollbackError);
+      }
+    }
     res.status(500).json({ ok: false, error: "restore failed" });
   }
 });
