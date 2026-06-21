@@ -19,7 +19,22 @@ class ServerConfig {
   }
 
   static String assetUrl(String path) {
-    final normalizedPath = path.startsWith('/') ? path : '/$path';
+    final raw = path.trim();
+    if (raw.isEmpty) return '';
+
+    final parsed = Uri.tryParse(raw);
+    if (parsed != null && parsed.hasScheme) {
+      if (!parsed.path.startsWith('/uploads/')) return raw;
+      return baseUri
+          .replace(
+            path: parsed.path,
+            query: parsed.hasQuery ? parsed.query : null,
+            fragment: parsed.hasFragment ? parsed.fragment : null,
+          )
+          .toString();
+    }
+
+    final normalizedPath = raw.startsWith('/') ? raw : '/$raw';
     return baseUri.replace(path: normalizedPath).toString();
   }
 }

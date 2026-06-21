@@ -42,7 +42,7 @@ class Promo {
         id: j['id'] ?? '',
         title: j['title'] ?? '',
         sub: j['sub'] ?? '',
-        imageUrl: j['imageUrl'] ?? '',
+        imageUrl: ServerConfig.assetUrl((j['imageUrl'] ?? '').toString()),
         focalX: (j['focalX'] as num?)?.toDouble() ?? 0,
         focalY: (j['focalY'] as num?)?.toDouble() ?? 0,
         linkType: j['linkType'] ?? 'none',
@@ -69,8 +69,12 @@ class PromoState extends ChangeNotifier {
   // 起動時ロード（正本はサーバー）
   // =====================
   Future<void> load() async {
-    await _loadFromServer();
-    await _saveLocal(); // キャッシュ
+    final loadedFromServer = await _loadFromServer();
+    if (loadedFromServer) {
+      await _saveLocal();
+    } else {
+      await _loadLocal();
+    }
     notifyListeners();
   }
 
@@ -85,6 +89,30 @@ class PromoState extends ChangeNotifier {
   // ---------------------
   // ローカル（キャッシュ）
   // ---------------------
+  Future<void> _loadLocal() async {
+    final prefs = await SharedPreferences.getInstance();
+    final topRaw = prefs.getString(_keyTop);
+    final bottomRaw = prefs.getString(_keyBottom);
+
+    try {
+      final top = topRaw == null ? <dynamic>[] : jsonDecode(topRaw) as List;
+      final bottom =
+          bottomRaw == null ? <dynamic>[] : jsonDecode(bottomRaw) as List;
+      _top
+        ..clear()
+        ..addAll(
+          top.map((e) => Promo.fromJson(Map<String, dynamic>.from(e))),
+        );
+      _bottom
+        ..clear()
+        ..addAll(
+          bottom.map((e) => Promo.fromJson(Map<String, dynamic>.from(e))),
+        );
+    } catch (e) {
+      debugPrint('Promo local load error: $e');
+    }
+  }
+
   Future<void> _saveLocal() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
@@ -100,10 +128,10 @@ class PromoState extends ChangeNotifier {
   // ---------------------
   // サーバー
   // ---------------------
-  Future<void> _loadFromServer() async {
+  Future<bool> _loadFromServer() async {
     try {
       final res = await http.get(ServerConfig.api('/api/promos'));
-      if (res.statusCode != 200) return;
+      if (res.statusCode != 200) return false;
 
       final decoded = jsonDecode(res.body);
       final t = decoded['top'] as List? ?? [];
@@ -115,7 +143,11 @@ class PromoState extends ChangeNotifier {
       _bottom
         ..clear()
         ..addAll(b.map((e) => Promo.fromJson(Map<String, dynamic>.from(e))));
-    } catch (_) {}
+      return true;
+    } catch (e) {
+      debugPrint('Promo server load error: $e');
+      return false;
+    }
   }
 
   Future<void> _saveToServer() async {
@@ -217,4 +249,3 @@ class PromoState extends ChangeNotifier {
 extension _FirstOrNull<E> on Iterable<E> {
   E? get firstOrNull => isEmpty ? null : first;
 }
- 
