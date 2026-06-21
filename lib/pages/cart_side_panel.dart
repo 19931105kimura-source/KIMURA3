@@ -51,8 +51,10 @@ class CartPage extends StatelessWidget {
 
     final realtime = context.watch<RealtimeState>();
 
-    final canOrder =
-        table != null && orderState.isActive(table) && orderState.canSubmitOrders;
+    final canOrder = table != null &&
+        orderState.isActive(table) &&
+        orderState.canSubmitOrders &&
+        realtime.connected;
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -69,7 +71,7 @@ class CartPage extends StatelessWidget {
             )
           : Column(
               children: [
-                if (!orderState.canSubmitOrders)
+                if (!realtime.connected || !orderState.canSubmitOrders)
                   Container(
                     width: double.infinity,
                     margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
@@ -79,9 +81,21 @@ class CartPage extends StatelessWidget {
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: Colors.orange),
                     ),
-                    child: const Text(
-                      '復帰後の同期中です。最新情報取得まで注文できません。',
-                      style: TextStyle(color: Colors.orange),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            realtime.connected
+                                ? '最新情報を同期中です。少し待ってから再試行してください。'
+                                : 'サーバーへ再接続しています。',
+                            style: const TextStyle(color: Colors.orange),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: realtime.reconnectNow,
+                          child: const Text('再接続'),
+                        ),
+                      ],
                     ),
                   ),
                 Expanded(
@@ -179,7 +193,13 @@ class CartPage extends StatelessWidget {
                           foregroundColor: Colors.black,
                         ),
                         onPressed: canOrder ? () => _confirmOrder(context, cart) : null,
-                        child: Text(canOrder ? '注文を確定する' : '受付終了'),
+                        child: Text(
+                          canOrder
+                              ? '注文を確定する'
+                              : table != null && !orderState.isActive(table)
+                                  ? '受付終了'
+                                  : '同期中',
+                        ),
                       ),
                     ],
                   ),
@@ -197,7 +217,7 @@ class CartPage extends StatelessWidget {
     final isActive = table != null && orderState.isActive(table);
     final canSubmit = orderState.canSubmitOrders;
 
-    if (!isActive || !canSubmit) {
+    if (!isActive || !canSubmit || !connected) {
       final detail = _buildFailureDetail(
         table: table,
         isActive: isActive,
