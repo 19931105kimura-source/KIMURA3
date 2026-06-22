@@ -1,1 +1,11 @@
 include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  exclude:
+    # Legacy root-level copies. The Flutter app source of truth is under lib/.
+    - data/**
+    - pages/**
+    - state/**
+    - widgets/**
+    - guest_home_page.dart
+    - main.dart

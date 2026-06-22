@@ -45,7 +45,17 @@ class _OwnerDeletedOrdersPageState extends State<OwnerDeletedOrdersPage> {
   }
 
   Future<void> _restore(Map<String, dynamic> entry) async {
-    final tables = context.read<OrderState>().tables;
+    final orderState = context.read<OrderState>();
+    final tables = orderState.tables
+        .where((table) => !orderState.isActive(table) && !orderState.hasOrder(table))
+        .toList();
+    if (tables.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('復元できる空席がありません。')),
+      );
+      return;
+    }
+
     final target = await showDialog<String>(
       context: context,
       builder: (dialogContext) => SimpleDialog(
@@ -76,8 +86,15 @@ class _OwnerDeletedOrdersPageState extends State<OwnerDeletedOrdersPage> {
       );
       await _load();
     } else {
+      var message = '復元に失敗しました';
+      try {
+        final body = jsonDecode(res.body);
+        if (body is Map && body['error'] == 'target table is in use') {
+          message = '選択した席は使用中です。別の空席を選んでください。';
+        }
+      } catch (_) {}
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('復元に失敗しました')),
+        SnackBar(content: Text(message)),
       );
     }
   }

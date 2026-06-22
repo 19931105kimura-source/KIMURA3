@@ -883,9 +883,10 @@ void startTableTimer({
   // ===================
   // テーブル開始 / 終了
   // ===================
-  Future<void> startTable(String table) async {
-    // ★ これを追加（サーバーへ通知）
-  await _startTableOnServer(table);
+  Future<bool> startTable(String table) async {
+    final started = await _startTableOnServer(table);
+    if (!started) return false;
+
     _activeTables.add(table);
 
     if (orderOf(table) == null) {
@@ -901,8 +902,10 @@ void startTableTimer({
 
     await _save();
     notifyListeners();
+    return true;
   }
-Future<void> _endTableOnServer(String table) async {
+
+Future<bool> _endTableOnServer(String table) async {
   try {
       final uri = ServerConfig.api('/api/rt/tables/$table/end');
 
@@ -912,17 +915,21 @@ Future<void> _endTableOnServer(String table) async {
       headers: {'Content-Type': 'application/json'},
     );
 
-    if (res.statusCode != 200) {
+    if (res.statusCode < 200 || res.statusCode >= 300) {
       debugPrint('END TABLE FAILED ${res.statusCode}');
+      return false;
     }
+    return true;
   } catch (e) {
     debugPrint('END TABLE ERROR: $e');
+    return false;
   }
 }
 
-  Future<void> endTable(String table) async {
-    // ★ 追加：サーバーへ終了通知
-  await _endTableOnServer(table);
+  Future<bool> endTable(String table) async {
+    final ended = await _endTableOnServer(table);
+    if (!ended) return false;
+
     _activeTables.remove(table);
     realtimeTableStatus[table] = 'closed';
     final rt = realtimeTables[table];
@@ -934,6 +941,7 @@ Future<void> _endTableOnServer(String table) async {
     clearTableTimer(table); // ★ 時間も確実に消す
     await _save();
     notifyListeners();
+    return true;
   }
 
   // ===================
@@ -1055,7 +1063,7 @@ if (order == null) {
     notifyListeners();
     return true;
   }
- Future<void> _startTableOnServer(String table) async {
+ Future<bool> _startTableOnServer(String table) async {
   try {
      final uri = ServerConfig.api('/api/rt/tables/$table/start');
 
@@ -1066,11 +1074,14 @@ if (order == null) {
     );
 
 
-    if (res.statusCode != 200) {
+    if (res.statusCode < 200 || res.statusCode >= 300) {
       debugPrint('START TABLE FAILED ${res.statusCode}');
+      return false;
     }
+    return true;
   } catch (e) {
     debugPrint('START TABLE ERROR: $e');
+    return false;
   }
 }
 

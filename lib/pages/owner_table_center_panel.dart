@@ -207,12 +207,13 @@ class _OwnerTableCenterPanelState extends State<OwnerTableCenterPanel> {
                 onPressed: isActive
     ? null
     : () async {
-        try {
-          await http.post(
-            ServerConfig.api('/api/rt/tables/${widget.table}/start'),
+        final ok = await orderState.startTable(widget.table);
+        if (!ok && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('席を開始できませんでした。通信状態を確認してください。'),
+            ),
           );
-        } catch (e) {
-          debugPrint('RT START ERROR: $e');
         }
       },
 
@@ -294,13 +295,16 @@ class _OwnerTableCenterPanelState extends State<OwnerTableCenterPanel> {
             OutlinedButton(
   onPressed: isActive
       ? () async {
-          try {
-            await http.post(
-              ServerConfig.api('/api/rt/tables/${widget.table}/end'),
-            );
+          final ok = await orderState.endTable(widget.table);
+          if (ok) {
+            if (!context.mounted) return;
             Navigator.pop(context);
-          } catch (e) {
-            debugPrint('RT END ERROR: $e');
+          } else if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('席を終了できませんでした。通信状態を確認してください。'),
+              ),
+            );
           }
         }
       : null,
@@ -327,8 +331,18 @@ class _OwnerTableCenterPanelState extends State<OwnerTableCenterPanel> {
                           );
                           return;
                         }
-                        await orderState.endTable(widget.table);
+                        final ended = await orderState.endTable(widget.table);
                         if (!context.mounted) return;
+                        if (!ended) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                '注文は削除しましたが、席を終了できませんでした。もう一度「終了」を押してください。',
+                              ),
+                            ),
+                          );
+                          return;
+                        }
                         Navigator.pop(context);
                       }
                     : null,

@@ -1249,13 +1249,22 @@ app.post("/api/deleted-orders/:id/restore", (req, res) => {
       return res.status(409).json({ ok: false, error: "already restored" });
     }
 
+    const targetState = store.getTable(targetTable);
+    const targetItems = typeof store.getTableItemsFromDb === "function"
+      ? store.getTableItemsFromDb(targetTable)
+      : [];
+    if (targetState?.status === "ordering" || targetItems.length > 0) {
+      return res.status(409).json({
+        ok: false,
+        error: "target table is in use",
+      });
+    }
+
     rollbackState = {
       table: store.tables.has(targetTable)
         ? { ...store.tables.get(targetTable) }
         : null,
-      lines: typeof store.getTableItemsFromDb === "function"
-        ? store.getTableItemsFromDb(targetTable)
-        : [],
+      lines: targetItems,
     };
     rollbackTableId = targetTable;
 
