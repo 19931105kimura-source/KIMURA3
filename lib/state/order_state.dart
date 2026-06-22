@@ -1224,6 +1224,40 @@ if (order == null) {
     }
   }
 
+  Future<bool> removeOrdersForTable(String table) async {
+    final targetOrder = realtimeOrderForDisplay(table) ?? orderOf(table);
+    if (targetOrder == null || targetOrder.lines.isEmpty) return false;
+
+    String? archivedHistoryId;
+    var serverDeleteCommitted = false;
+    try {
+      archivedHistoryId = await _archiveDeletedOrder(targetOrder);
+      if (archivedHistoryId == null) {
+        throw Exception('archive deleted order failed');
+      }
+
+      await _syncTableLinesToServer(table, const <OrderLine>[]);
+
+      serverDeleteCommitted = true;
+      _orders.removeWhere((order) => order.table == table);
+      _clearRealtimeOrderCacheForTable(table);
+
+      try {
+        await _save();
+      } catch (e) {
+        debugPrint('ORDER LOCAL SAVE ERROR AFTER TABLE DELETE: $e');
+      }
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('REMOVE TABLE ORDERS ERROR: $e');
+      if (!serverDeleteCommitted && archivedHistoryId != null) {
+        await _deleteArchivedOrderHistory(archivedHistoryId);
+      }
+      return false;
+    }
+  }
+
   void _clearRealtimeOrderCacheForTable(String table) {
     final orderIds = realtimeOrdersByTable.remove(table);
     if (orderIds is List) {

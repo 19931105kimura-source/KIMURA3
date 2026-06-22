@@ -30,7 +30,8 @@ class _OwnerTableCenterPanelState extends State<OwnerTableCenterPanel> {
     final rtState = context.watch<RealtimeState>();
 
     final orderData = orderState.orderOf(widget.table);
-   final displayOrder = orderState.realtimeOrderForDisplay(widget.table);
+    final displayOrder =
+        orderState.realtimeOrderForDisplay(widget.table) ?? orderData;
     final rtTable = rtState.tables[widget.table] as Map<String, dynamic>?;
     final status = (rtTable?['status'] ?? '').toString();
     final isActive = status == 'ordering';
@@ -103,13 +104,13 @@ class _OwnerTableCenterPanelState extends State<OwnerTableCenterPanel> {
 
          const SizedBox(height: 16),
           // ===== 注文一覧 =====
-          if (orderData != null && orderData.lines.isNotEmpty)
+          if (displayOrder != null && displayOrder.lines.isNotEmpty)
             SizedBox(
               height: 180,
               child: Builder(
                 builder: (context) {
                   final lines = orderState.aggregateLinesForDisplay(
-                    orderData.lines,
+                    displayOrder.lines,
                   );
 
                   bool isExtension(dynamic l) {
@@ -308,14 +309,26 @@ class _OwnerTableCenterPanelState extends State<OwnerTableCenterPanel> {
 
 
              TextButton(
-                onPressed: orderData != null
+                onPressed: displayOrder != null && displayOrder.lines.isNotEmpty
                     ? () async {
                         final confirmed = await confirmOrderDeletion(context);
                         if (!confirmed || !context.mounted) return;
 
-                        final ok = await orderState.removeOrder(orderData.id);
-                         if (!ok) return;
+                        final ok =
+                            await orderState.removeOrdersForTable(widget.table);
+                        if (!ok) {
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                '注文削除の同期に失敗しました。再試行してください。',
+                              ),
+                            ),
+                          );
+                          return;
+                        }
                         await orderState.endTable(widget.table);
+                        if (!context.mounted) return;
                         Navigator.pop(context);
                       }
                     : null,
