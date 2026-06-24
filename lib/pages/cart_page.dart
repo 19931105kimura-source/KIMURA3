@@ -37,6 +37,15 @@ class CartPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cart = context.watch<CartState>();
+    final orderState = context.watch<OrderState>();
+    final table = context.select<AppState, String?>((s) => s.guestTable);
+    final realtime = context.watch<RealtimeState>();
+    final isSubmitting = orderState.orderSubmitInProgress;
+    final canOrder = table != null &&
+        orderState.isActive(table) &&
+        orderState.canSubmitOrders &&
+        realtime.connected &&
+        !isSubmitting;
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -149,9 +158,8 @@ class CartPage extends StatelessWidget {
                           backgroundColor: accent,
                           foregroundColor: Colors.black,
                         ),
-                        onPressed: () =>
-                            _confirmOrder(context, cart),
-                        child: const Text('注文を確定する'),
+                        onPressed: canOrder ? () => _confirmOrder(context, cart) : null,
+                        child: Text(isSubmitting ? '送信中...' : '注文を確定する'),
                       ),
                     ],
                   ),
@@ -174,7 +182,14 @@ class CartPage extends StatelessWidget {
     final isActive = table != null && orderState.isActive(table);
     final canSubmit = orderState.canSubmitOrders;
 
-    if (!isActive || !canSubmit) {
+    if (orderState.orderSubmitInProgress) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('注文を送信中です。そのままお待ちください。')),
+      );
+      return;
+    }
+
+    if (!isActive || !canSubmit || !realtime.connected) {
       final detail = _buildFailureDetail(
         table: table,
         isActive: isActive,

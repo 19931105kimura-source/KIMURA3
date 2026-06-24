@@ -51,10 +51,12 @@ class CartPage extends StatelessWidget {
 
     final realtime = context.watch<RealtimeState>();
 
+    final isSubmitting = orderState.orderSubmitInProgress;
     final canOrder = table != null &&
         orderState.isActive(table) &&
         orderState.canSubmitOrders &&
-        realtime.connected;
+        realtime.connected &&
+        !isSubmitting;
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -194,9 +196,11 @@ class CartPage extends StatelessWidget {
                         ),
                         onPressed: canOrder ? () => _confirmOrder(context, cart) : null,
                         child: Text(
-                          canOrder
-                              ? '注文を確定する'
-                              : table != null && !orderState.isActive(table)
+                          isSubmitting
+                              ? '送信中...'
+                              : canOrder
+                                  ? '注文を確定する'
+                                  : table != null && !orderState.isActive(table)
                                   ? '受付終了'
                                   : '同期中',
                         ),
@@ -216,6 +220,13 @@ class CartPage extends StatelessWidget {
 
     final isActive = table != null && orderState.isActive(table);
     final canSubmit = orderState.canSubmitOrders;
+
+    if (orderState.orderSubmitInProgress) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('注文を送信中です。そのままお待ちください。')),
+      );
+      return;
+    }
 
     if (!isActive || !canSubmit || !connected) {
       final detail = _buildFailureDetail(

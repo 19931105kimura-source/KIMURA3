@@ -185,11 +185,15 @@ class OrderState extends ChangeNotifier {
 
   String? _lastSubmitError;
   int? _lastSubmitStatusCode;
+  bool _orderSubmitInProgress = false;
 
   String? get lastSubmitError => _lastSubmitError;
   int? get lastSubmitStatusCode => _lastSubmitStatusCode;
+  bool get orderSubmitInProgress => _orderSubmitInProgress;
 String buildSubmitErrorMessageJa() {
     switch (_lastSubmitError) {
+      case 'order_in_progress':
+        return '注文を送信中です。完了までそのままお待ちください。';
       case 'resync_required':
         return '同期中のため注文できません。数秒待って再試行してください。';
       case 'table_not_ordering':
@@ -213,7 +217,13 @@ String buildSubmitErrorMessageJa() {
   bool _needsResync = true;
   DateTime? _lastSyncedAt;
 
-  bool get canSubmitOrders => !_needsResync;
+  bool get hasFreshSnapshot {
+    final syncedAt = _lastSyncedAt;
+    if (syncedAt == null) return false;
+    return DateTime.now().difference(syncedAt) < const Duration(seconds: 15);
+  }
+
+  bool get canSubmitOrders => !_needsResync || hasFreshSnapshot;
   DateTime? get lastSyncedAt => _lastSyncedAt;
 
   void markNeedsResync() {
@@ -959,6 +969,12 @@ Future<bool> addFromCart(
   _lastSubmitError = null;
   _lastSubmitStatusCode = null;
 
+  if (_orderSubmitInProgress) {
+    _lastSubmitError = 'order_in_progress';
+    notifyListeners();
+    return false;
+  }
+
   if (!canSubmitOrders) {
     _lastSubmitError = 'resync_required';
     return false;
@@ -987,7 +1003,10 @@ Future<bool> addFromCart(
     return false;
   }
 
+  _orderSubmitInProgress = true;
+  notifyListeners();
 
+  try {
     var order = orderOf(table);
      final bool createdOrder = order == null;
     List<OrderLine>? previousLines;
@@ -1067,6 +1086,10 @@ if (order == null) {
     await _save();
     notifyListeners();
     return true;
+  } finally {
+    _orderSubmitInProgress = false;
+    notifyListeners();
+  }
   }
  Future<bool> _startTableOnServer(String table) async {
   try {
