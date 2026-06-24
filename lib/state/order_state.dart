@@ -428,6 +428,11 @@ Order? realtimeOrderForDisplay(String table) {
 // ★ Realtime → Order に変換（表示専用）
 // ===================
 Order? _buildRealtimeOrder(String table) {
+  final rtTable = realtimeTables[table];
+  if (rtTable is Map && rtTable['status'] != 'ordering') {
+    return null;
+  }
+
   // ordersByTable[table] が List じゃなければ Realtime なし扱い
   final orderIds = realtimeOrdersByTable[table];
   if (orderIds is! List) return null;
