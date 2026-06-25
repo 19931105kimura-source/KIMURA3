@@ -23,6 +23,8 @@ class CartLine {
 
 class CartState extends ChangeNotifier {
   final List<CartLine> _lines = [];
+  String? _pendingOrderRequestId;
+  String? _pendingOrderSignature;
 
   /// cart_side_panel.dart 用
   List<CartLine> get items => List.unmodifiable(_lines);
@@ -38,6 +40,52 @@ class CartState extends ChangeNotifier {
     return sum;
   }
 
+  String requestIdForTable(String table) {
+    final signature = _signatureForTable(table);
+    if (_pendingOrderRequestId != null && _pendingOrderSignature == signature) {
+      return _pendingOrderRequestId!;
+    }
+
+    final hash = _stableHash(signature).toRadixString(16);
+    _pendingOrderSignature = signature;
+    _pendingOrderRequestId =
+        'cart_${DateTime.now().microsecondsSinceEpoch}_$hash';
+    return _pendingOrderRequestId!;
+  }
+
+  String _signatureForTable(String table) {
+    final parts =
+        _lines
+            .map(
+              (l) => [
+                l.category,
+                l.brand,
+                l.label,
+                l.price.toString(),
+                l.qty.toString(),
+                l.printGroup,
+              ].join('\u001f'),
+            )
+            .toList()
+          ..sort();
+
+    return '$table\u001e${parts.join('\u001e')}';
+  }
+
+  int _stableHash(String value) {
+    var hash = 0x811c9dc5;
+    for (final codeUnit in value.codeUnits) {
+      hash ^= codeUnit;
+      hash = (hash * 0x01000193) & 0x7fffffff;
+    }
+    return hash;
+  }
+
+  void _resetPendingOrderRequest() {
+    _pendingOrderRequestId = null;
+    _pendingOrderSignature = null;
+  }
+
   /// =========================
   /// 追加（ゲスト・共通）
   /// =========================
@@ -48,11 +96,11 @@ class CartState extends ChangeNotifier {
     required int price,
     String? printGroup,
   }) {
+    _resetPendingOrderRequest();
     // ★ ここが最終ルール
-    final fixedPrintGroup =
-        category == 'キャストドリンク'
-            ? 'kitchen'
-            : (printGroup ?? 'kitchen');
+    final fixedPrintGroup = category == 'キャストドリンク'
+        ? 'kitchen'
+        : (printGroup ?? 'kitchen');
 
     final key = '$category|$brand|$label|$price';
     final i = _lines.indexWhere((e) => e.key == key);
@@ -78,11 +126,13 @@ class CartState extends ChangeNotifier {
   /// 数量操作
   /// =========================
   void increment(CartLine line) {
+    _resetPendingOrderRequest();
     line.qty += 1;
     notifyListeners();
   }
 
   void decrement(CartLine line) {
+    _resetPendingOrderRequest();
     line.qty -= 1;
     if (line.qty <= 0) {
       _lines.remove(line);
@@ -95,11 +145,13 @@ class CartState extends ChangeNotifier {
   void dec(CartLine line) => decrement(line);
 
   void remove(CartLine line) {
+    _resetPendingOrderRequest();
     _lines.remove(line);
     notifyListeners();
   }
 
   void clear() {
+    _resetPendingOrderRequest();
     _lines.clear();
     notifyListeners();
   }

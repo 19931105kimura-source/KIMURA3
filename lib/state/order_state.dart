@@ -8,14 +8,7 @@ import 'package:http/http.dart' as http;
 
 import 'cart_state.dart';
 
-
-
 import '../data/server_config.dart';
-
-
-
-
-
 
 /// =======================
 /// テーブルの時間情報
@@ -34,18 +27,20 @@ class TableTimerInfo {
   });
 
   Map<String, dynamic> toJson() => {
-        'remainingSeconds': remainingSeconds,
-        'totalSeconds': totalSeconds, // ★ 保存
-        'autoExtend': autoExtend,
-        'startTime': startTime,
-      };
+    'remainingSeconds': remainingSeconds,
+    'totalSeconds': totalSeconds, // ★ 保存
+    'autoExtend': autoExtend,
+    'startTime': startTime,
+  };
 
   static TableTimerInfo fromJson(Map<String, dynamic> j) => TableTimerInfo(
-        remainingSeconds: (j['remainingSeconds'] ?? 0) as int,
-        totalSeconds: (j['totalSeconds'] ?? j['remainingSeconds'] ?? 0) as int, // ★ 復元（古いデータはremainingで代用）
-        autoExtend: (j['autoExtend'] ?? false) as bool,
-        startTime: j['startTime'] as String?,
-      );
+    remainingSeconds: (j['remainingSeconds'] ?? 0) as int,
+    totalSeconds:
+        (j['totalSeconds'] ?? j['remainingSeconds'] ?? 0)
+            as int, // ★ 復元（古いデータはremainingで代用）
+    autoExtend: (j['autoExtend'] ?? false) as bool,
+    startTime: j['startTime'] as String?,
+  );
 }
 
 /// =======================
@@ -83,63 +78,62 @@ class OrderLine {
     this.printGroup = 'kitchen',
   });
 
- Map<String, dynamic> toServerItem() {
-  final trimmedLabel = label.trim();
-  final displayName = trimmedLabel.isNotEmpty ? trimmedLabel : brand;
-  final displayLabel = trimmedLabel.isNotEmpty ? trimmedLabel : brand;
- return {
-    'lineId': lineId,
-    'name': displayName,    // ★ Node 側で使う表示名
-    'label': displayLabel,  // 互換用（残してOK）
-    'brand': brand,
-    'category': category,
-    'section': section,
-    'subCategory': subCategory,
-    'price': price,
-    'qty': qty,
-    'shouldPrint': shouldPrint,
-    'printGroup': printGroup, // ★ kitchen / register
-  };
-}
+  Map<String, dynamic> toServerItem() {
+    final trimmedLabel = label.trim();
+    final displayName = trimmedLabel.isNotEmpty ? trimmedLabel : brand;
+    final displayLabel = trimmedLabel.isNotEmpty ? trimmedLabel : brand;
+    return {
+      'lineId': lineId,
+      'name': displayName, // ★ Node 側で使う表示名
+      'label': displayLabel, // 互換用（残してOK）
+      'brand': brand,
+      'category': category,
+      'section': section,
+      'subCategory': subCategory,
+      'price': price,
+      'qty': qty,
+      'shouldPrint': shouldPrint,
+      'printGroup': printGroup, // ★ kitchen / register
+    };
+  }
 
-
- OrderLine copyWith({int? qty, String? lineId}) => OrderLine(
-        lineId: lineId ?? this.lineId,
-        category: category,
-        brand: brand,
-        label: label,
-        price: price,
-        qty: qty ?? this.qty,
-        section: section,
-        subCategory: subCategory,
-        shouldPrint: shouldPrint,
-        printGroup: printGroup,
-      );
+  OrderLine copyWith({int? qty, String? lineId}) => OrderLine(
+    lineId: lineId ?? this.lineId,
+    category: category,
+    brand: brand,
+    label: label,
+    price: price,
+    qty: qty ?? this.qty,
+    section: section,
+    subCategory: subCategory,
+    shouldPrint: shouldPrint,
+    printGroup: printGroup,
+  );
 
   Map<String, dynamic> toJson() => {
-        'category': category,
-        'brand': brand,
-        'label': label,
-        'price': price,
-        'qty': qty,
-        'section': section,
-        'subCategory': subCategory,
-        'shouldPrint': shouldPrint,
-        'printGroup': printGroup,
-      };
+    'category': category,
+    'brand': brand,
+    'label': label,
+    'price': price,
+    'qty': qty,
+    'section': section,
+    'subCategory': subCategory,
+    'shouldPrint': shouldPrint,
+    'printGroup': printGroup,
+  };
 
- static OrderLine fromJson(Map<String, dynamic> j) => OrderLine(
-        lineId: j['lineId'] as String?,
-        category: (j['category'] ?? '') as String,
-        brand: (j['brand'] ?? '') as String,
-        label: (j['label'] ?? '') as String,
-        price: (j['price'] ?? 0) as int,
-        qty: (j['qty'] ?? 0) as int,
-        section: j['section'] as String?,
-        subCategory: (j['subCategory'] ?? '') as String,
-        shouldPrint: (j['shouldPrint'] ?? true) as bool,
-        printGroup: (j['printGroup'] ?? 'kitchen') as String,
-      );
+  static OrderLine fromJson(Map<String, dynamic> j) => OrderLine(
+    lineId: j['lineId'] as String?,
+    category: (j['category'] ?? '') as String,
+    brand: (j['brand'] ?? '') as String,
+    label: (j['label'] ?? '') as String,
+    price: (j['price'] ?? 0) as int,
+    qty: (j['qty'] ?? 0) as int,
+    section: j['section'] as String?,
+    subCategory: (j['subCategory'] ?? '') as String,
+    shouldPrint: (j['shouldPrint'] ?? true) as bool,
+    printGroup: (j['printGroup'] ?? 'kitchen') as String,
+  );
 }
 
 /// =======================
@@ -161,20 +155,20 @@ class Order {
   int get total => lines.fold(0, (sum, l) => sum + l.price * l.qty);
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'table': table,
-        'createdAt': createdAt.toIso8601String(),
-        'lines': lines.map((e) => e.toJson()).toList(),
-      };
+    'id': id,
+    'table': table,
+    'createdAt': createdAt.toIso8601String(),
+    'lines': lines.map((e) => e.toJson()).toList(),
+  };
 
   static Order fromJson(Map<String, dynamic> j) => Order(
-        id: (j['id'] ?? '') as String,
-        table: (j['table'] ?? '') as String,
-        createdAt: DateTime.parse(j['createdAt'] as String),
-        lines: (j['lines'] as List)
-            .map((e) => OrderLine.fromJson(Map<String, dynamic>.from(e)))
-            .toList(),
-      );
+    id: (j['id'] ?? '') as String,
+    table: (j['table'] ?? '') as String,
+    createdAt: DateTime.parse(j['createdAt'] as String),
+    lines: (j['lines'] as List)
+        .map((e) => OrderLine.fromJson(Map<String, dynamic>.from(e)))
+        .toList(),
+  );
 }
 
 /// =======================
@@ -182,7 +176,6 @@ class Order {
 /// =======================
 
 class OrderState extends ChangeNotifier {
-
   String? _lastSubmitError;
   int? _lastSubmitStatusCode;
   bool _orderSubmitInProgress = false;
@@ -190,7 +183,7 @@ class OrderState extends ChangeNotifier {
   String? get lastSubmitError => _lastSubmitError;
   int? get lastSubmitStatusCode => _lastSubmitStatusCode;
   bool get orderSubmitInProgress => _orderSubmitInProgress;
-String buildSubmitErrorMessageJa() {
+  String buildSubmitErrorMessageJa() {
     switch (_lastSubmitError) {
       case 'order_in_progress':
         return '注文を送信中です。完了までそのままお待ちください。';
@@ -214,6 +207,7 @@ String buildSubmitErrorMessageJa() {
         return '注文を確定できませんでした。通信状態を確認して再試行してください。';
     }
   }
+
   bool _needsResync = true;
   DateTime? _lastSyncedAt;
 
@@ -232,38 +226,54 @@ String buildSubmitErrorMessageJa() {
     notifyListeners();
   }
 
+  /// ===================
+  /// ★ RT 正本：この席は注文できるか
+  /// ===================
+  bool canOrderTable(String table) {
+    if (_needsResync) return false;
+    // Realtime の status が最優先
+    final status = realtimeTableStatus[table];
+    if (status != null) {
+      return status == 'ordering';
+    }
 
- /// ===================
-/// ★ RT 正本：この席は注文できるか
-/// ===================
-bool canOrderTable(String table) {
-  if (_needsResync) return false;
-  // Realtime の status が最優先
-  final status = realtimeTableStatus[table];
-  if (status != null) {
-    return status == 'ordering';
+    // fallback（RT 未接続時など）
+    return _activeTables.contains(table);
   }
 
-  // fallback（RT 未接続時など）
-  return _activeTables.contains(table);
-}
-
   bool isRealtimeOrderId(String orderId) {
-  return orderId.startsWith('rt_');
-}
- // ★ Realtime：テーブルの状態（ordering / closed）
-Map<String, String> realtimeTableStatus = {};
+    return orderId.startsWith('rt_');
+  }
+
+  // ★ Realtime：テーブルの状態（ordering / closed）
+  Map<String, String> realtimeTableStatus = {};
 
   Timer? _globalTimer;
 
-
-   static const _keyOrders = 'orders_v1';
+  static const _keyOrders = 'orders_v1';
   static const _keyActive = 'active_tables_v1';
   static const _defaultTables = <String>[
-    'C1', 'C2', 'C3', 'C4',
-    '1', '2', '3', '4', '5', '6', '7',
-    '8', '9', '10', '11', '12', '13', '14',
-    'VA', 'VB', 'VC',
+    'C1',
+    'C2',
+    'C3',
+    'C4',
+    '1',
+    '2',
+    '3',
+    '4',
+    '5',
+    '6',
+    '7',
+    '8',
+    '9',
+    '10',
+    '11',
+    '12',
+    '13',
+    '14',
+    'VA',
+    'VB',
+    'VC',
   ];
 
   // ★ 追加：タイマー永続化キー（外部APIに影響しない）
@@ -273,90 +283,85 @@ Map<String, String> realtimeTableStatus = {};
   final Set<String> _activeTables = {};
 
   // ===============================
-// Realtime snapshot 反映（Owner用）
-// ===============================
+  // Realtime snapshot 反映（Owner用）
+  // ===============================
   void applyRealtimeSnapshot(Map<String, dynamic> payload) {
-  _needsResync = false;
-  _lastSyncedAt = DateTime.now();
-  // ★ 追加：テーブル状態を保存
-  realtimeTables =
-      Map<String, dynamic>.from(payload['tables'] ?? {});
-  // ★ 席の状態を RT から反映
-realtimeTableStatus.clear();
+    _needsResync = false;
+    _lastSyncedAt = DateTime.now();
+    // ★ 追加：テーブル状態を保存
+    realtimeTables = Map<String, dynamic>.from(payload['tables'] ?? {});
+    // ★ 席の状態を RT から反映
+    realtimeTableStatus.clear();
 
-final tables = payload['tables'];
-if (tables is Map) {
-  tables.forEach((tableId, v) {
-    if (v is Map && v['status'] is String) {
-      realtimeTableStatus[tableId] = v['status'];
+    final tables = payload['tables'];
+    if (tables is Map) {
+      tables.forEach((tableId, v) {
+        if (v is Map && v['status'] is String) {
+          realtimeTableStatus[tableId] = v['status'];
+        }
+      });
     }
-  });
-}
 
-  // ★ ① RTデータを state に保存
-  realtimeOrdersByTable =
-      Map<String, dynamic>.from(payload['ordersByTable'] ?? {});
-  realtimeOrderItems =
-      Map<String, dynamic>.from(payload['orderItems'] ?? {});
-  // ★ RT status → activeTables 同期
-final tableMap =
-    Map<String, dynamic>.from(payload['tables'] ?? {});
-_activeTables.clear();
+    // ★ ① RTデータを state に保存
+    realtimeOrdersByTable = Map<String, dynamic>.from(
+      payload['ordersByTable'] ?? {},
+    );
+    realtimeOrderItems = Map<String, dynamic>.from(payload['orderItems'] ?? {});
+    // ★ RT status → activeTables 同期
+    final tableMap = Map<String, dynamic>.from(payload['tables'] ?? {});
+    _activeTables.clear();
 
-tableMap.forEach((tableId, data) {
-  if (data is Map && data['status'] == 'ordering') {
-    _activeTables.add(tableId.toString());
-  }
-});
+    tableMap.forEach((tableId, data) {
+      if (data is Map && data['status'] == 'ordering') {
+        _activeTables.add(tableId.toString());
+      }
+    });
 
+    // ★ ② RTを正本として orders を組み直す
+    final List<Order> newOrders = [];
 
-  // ★ ② RTを正本として orders を組み直す
-  final List<Order> newOrders = [];
+    realtimeOrdersByTable.forEach((table, orderIds) {
+      if (orderIds is! List) return;
 
-  realtimeOrdersByTable.forEach((table, orderIds) {
-    if (orderIds is! List) return;
+      final List<OrderLine> lines = [];
 
-    final List<OrderLine> lines = [];
+      for (final orderId in orderIds) {
+        final rawLines = realtimeOrderItems[orderId];
+        if (rawLines is! List) continue;
 
-    for (final orderId in orderIds) {
-      final rawLines = realtimeOrderItems[orderId];
-      if (rawLines is! List) continue;
-
-      for (final raw in rawLines) {
-        if (raw is Map<String, dynamic>) {
-          lines.add(OrderLine.fromJson(raw));
+        for (final raw in rawLines) {
+          if (raw is Map<String, dynamic>) {
+            lines.add(OrderLine.fromJson(raw));
+          }
         }
       }
-    }
 
-    if (lines.isEmpty) return;
+      if (lines.isEmpty) return;
 
-    newOrders.add(
-      Order(
-        id: 'rt_$table',
-        table: table,
-        createdAt: DateTime.now(),
-        lines: lines,
-      ),
-    );
-  });
+      newOrders.add(
+        Order(
+          id: 'rt_$table',
+          table: table,
+          createdAt: DateTime.now(),
+          lines: lines,
+        ),
+      );
+    });
 
-  _orders
-    ..clear()
-    ..addAll(newOrders);
+    _orders
+      ..clear()
+      ..addAll(newOrders);
 
-  notifyListeners();
-}
-
-
+    notifyListeners();
+  }
 
   // ===================
-// ★ Realtime 注文データ（WebSocket）
-// ===================
-Map<String, dynamic> realtimeOrdersByTable = {};
-Map<String, dynamic> realtimeOrderItems = {};
-// ★ Realtime：テーブル状態（status の正本）
-Map<String, dynamic> realtimeTables = {};
+  // ★ Realtime 注文データ（WebSocket）
+  // ===================
+  Map<String, dynamic> realtimeOrdersByTable = {};
+  Map<String, dynamic> realtimeOrderItems = {};
+  // ★ Realtime：テーブル状態（status の正本）
+  Map<String, dynamic> realtimeTables = {};
 
   /// テーブル一覧（正本はサーバー）
   final List<String> _tables = [..._defaultTables];
@@ -366,47 +371,47 @@ Map<String, dynamic> realtimeTables = {};
 
   OrderState();
 
-   // ===================
-// ★ Realtime 用：席ごとの注文明細数
-// ===================
-int realtimeItemCountOf(String table) {
-  final orderIds = realtimeOrdersByTable[table];
-  if (orderIds is! List) return 0;
+  // ===================
+  // ★ Realtime 用：席ごとの注文明細数
+  // ===================
+  int realtimeItemCountOf(String table) {
+    final orderIds = realtimeOrdersByTable[table];
+    if (orderIds is! List) return 0;
 
-  int count = 0;
-  for (final orderId in orderIds) {
-    final items = realtimeOrderItems[orderId];
-    if (items is List) {
-      count += items.length;
+    int count = 0;
+    for (final orderId in orderIds) {
+      final items = realtimeOrderItems[orderId];
+      if (items is List) {
+        count += items.length;
+      }
     }
+    return count;
   }
-  return count;
-}
 
   // ===================
   // getter（UI用）
   // ===================
   List<String> get tables => List.unmodifiable(_tables);
 
-  List<Order> get orders => _orders.toList()
-    ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+  List<Order> get orders =>
+      _orders.toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
   bool isActive(String table) {
-  // ★ Realtime の status があればそれを正本にする
-  final rt = realtimeTables[table];
-  if (rt is Map && rt['status'] == 'ordering') {
-    return true;
+    // ★ Realtime の status があればそれを正本にする
+    final rt = realtimeTables[table];
+    if (rt is Map && rt['status'] == 'ordering') {
+      return true;
+    }
+
+    // ★ Realtime がまだ来ていない場合のみローカルを見る
+    return _activeTables.contains(table);
   }
 
-  // ★ Realtime がまだ来ていない場合のみローカルを見る
-  return _activeTables.contains(table);
-}
-
   bool isActiveByRealtime(String table) {
-  final t = realtimeTables[table];
-  if (t is! Map<String, dynamic>) return false;
-  return t['status'] == 'ordering';
-}
+    final t = realtimeTables[table];
+    if (t is! Map<String, dynamic>) return false;
+    return t['status'] == 'ordering';
+  }
 
   Order? orderOf(String table) {
     try {
@@ -417,95 +422,97 @@ int realtimeItemCountOf(String table) {
   }
 
   int totalOf(String table) => orderOf(table)?.total ?? 0;
-// ===================
-// ★ 表示用：Realtime があればそれを優先する
-// ===================
-Order? orderForDisplay(String table) {
-  // ① Realtime の注文があるか？
-  final rt = _buildRealtimeOrder(table);
-  if (rt != null) return rt;
+  // ===================
+  // ★ 表示用：Realtime があればそれを優先する
+  // ===================
+  Order? orderForDisplay(String table) {
+    // ① Realtime の注文があるか？
+    final rt = _buildRealtimeOrder(table);
+    if (rt != null) return rt;
 
-  // ② なければ null（表示はサーバー同期完了を待つ）
-  return null;
- }
-// ===================
-// ★ サーバー正本表示用：Realtime のみを返す
-// ===================
-Order? realtimeOrderForDisplay(String table) {
-  return _buildRealtimeOrder(table);
-}
-// ===================
-// ★ Realtime → Order に変換（表示専用）
-// ===================
-Order? _buildRealtimeOrder(String table) {
-  final rtTable = realtimeTables[table];
-  if (rtTable is Map && rtTable['status'] != 'ordering') {
+    // ② なければ null（表示はサーバー同期完了を待つ）
     return null;
   }
 
-  // ordersByTable[table] が List じゃなければ Realtime なし扱い
-  final orderIds = realtimeOrdersByTable[table];
-  if (orderIds is! List) return null;
+  // ===================
+  // ★ サーバー正本表示用：Realtime のみを返す
+  // ===================
+  Order? realtimeOrderForDisplay(String table) {
+    return _buildRealtimeOrder(table);
+  }
 
-  // Realtime の item を集める（orderIdごとに items が入っている想定）
-  final List<Map<String, dynamic>> rawItems = [];
+  // ===================
+  // ★ Realtime → Order に変換（表示専用）
+  // ===================
+  Order? _buildRealtimeOrder(String table) {
+    final rtTable = realtimeTables[table];
+    if (rtTable is Map && rtTable['status'] != 'ordering') {
+      return null;
+    }
 
-  for (final orderId in orderIds) {
-    final items = realtimeOrderItems[orderId];
-    if (items is List) {
-      for (final it in items) {
-        if (it is Map) {
-          rawItems.add(Map<String, dynamic>.from(it));
+    // ordersByTable[table] が List じゃなければ Realtime なし扱い
+    final orderIds = realtimeOrdersByTable[table];
+    if (orderIds is! List) return null;
+
+    // Realtime の item を集める（orderIdごとに items が入っている想定）
+    final List<Map<String, dynamic>> rawItems = [];
+
+    for (final orderId in orderIds) {
+      final items = realtimeOrderItems[orderId];
+      if (items is List) {
+        for (final it in items) {
+          if (it is Map) {
+            rawItems.add(Map<String, dynamic>.from(it));
+          }
         }
       }
     }
-  }
 
-  // 何もなければ Realtime なし
-  if (rawItems.isEmpty) return null;
+    // 何もなければ Realtime なし
+    if (rawItems.isEmpty) return null;
 
-  final List<OrderLine> lines = [];
+    final List<OrderLine> lines = [];
 
-  for (final it in rawItems) {
-    final name = (it['name'] ?? '').toString().trim();
-    final rawLabel = (it['label'] ?? '').toString().trim();
-    final rawBrand = (it['brand'] ?? '').toString().trim();
-    final rawCategory = (it['category'] ?? '').toString().trim();
+    for (final it in rawItems) {
+      final name = (it['name'] ?? '').toString().trim();
+      final rawLabel = (it['label'] ?? '').toString().trim();
+      final rawBrand = (it['brand'] ?? '').toString().trim();
+      final rawCategory = (it['category'] ?? '').toString().trim();
 
-    final label = rawLabel.isNotEmpty ? rawLabel : name;
-    if (label.isEmpty) continue;
+      final label = rawLabel.isNotEmpty ? rawLabel : name;
+      if (label.isEmpty) continue;
 
-    final brand = rawBrand == 'RT' ? '' : rawBrand;
-    final category = rawCategory == 'RT' ? '' : rawCategory;
+      final brand = rawBrand == 'RT' ? '' : rawBrand;
+      final category = rawCategory == 'RT' ? '' : rawCategory;
 
-    final price = _toInt(it['price']);
-    final qty = _toInt(it['quantity'] ?? it['qty']);
+      final price = _toInt(it['price']);
+      final qty = _toInt(it['quantity'] ?? it['qty']);
 
-    lines.add(
-      OrderLine(
-        lineId: it['lineId'] as String?, // ★ 追加
-       category: category,
-        brand: brand,
-        label: label,
-        price: price,
-        qty: qty <= 0 ? 1 : qty,
-         section: (it['section'] ?? '').toString(),
-        subCategory: (it['subCategory'] ?? '').toString(),
-        shouldPrint: false,
-        printGroup: (it['printGroup'] ?? 'kitchen').toString(),
-      ),
+      lines.add(
+        OrderLine(
+          lineId: it['lineId'] as String?, // ★ 追加
+          category: category,
+          brand: brand,
+          label: label,
+          price: price,
+          qty: qty <= 0 ? 1 : qty,
+          section: (it['section'] ?? '').toString(),
+          subCategory: (it['subCategory'] ?? '').toString(),
+          shouldPrint: false,
+          printGroup: (it['printGroup'] ?? 'kitchen').toString(),
+        ),
+      );
+    }
+
+    if (lines.isEmpty) return null;
+
+    return Order(
+      id: 'rt_$table',
+      table: table,
+      createdAt: DateTime.now(),
+      lines: lines,
     );
   }
-
-  if (lines.isEmpty) return null;
-
- return Order(
-    id: 'rt_$table',
-    table: table,
-    createdAt: DateTime.now(),
-    lines: lines,
-  );
-}
 
   /// 表示用：同一商品を合算して返す
   List<OrderLine> aggregateLinesForDisplay(List<OrderLine> lines) {
@@ -537,7 +544,7 @@ Order? _buildRealtimeOrder(String table) {
         a.subCategory == b.subCategory;
   }
 
-   Future<void> removeAggregatedLine(String orderId, OrderLine line) async {
+  Future<void> removeAggregatedLine(String orderId, OrderLine line) async {
     final oIdx = _orders.indexWhere((o) => o.id == orderId);
     if (oIdx == -1) return;
     final order = _orders[oIdx];
@@ -571,8 +578,11 @@ Order? _buildRealtimeOrder(String table) {
     notifyListeners();
   }
 
-  Future<void> _syncTableLinesToServer(String table, List<OrderLine> lines) async {
-      final uri = ServerConfig.api('/api/orders/sync-table');
+  Future<void> _syncTableLinesToServer(
+    String table,
+    List<OrderLine> lines,
+  ) async {
+    final uri = ServerConfig.api('/api/orders/sync-table');
     final payload = {
       'tableId': table,
       'lines': lines.map((l) => l.toServerItem()).toList(),
@@ -582,26 +592,25 @@ Order? _buildRealtimeOrder(String table) {
       uri,
       headers: const {'Content-Type': 'application/json'},
       body: jsonEncode(payload),
-  );
+    );
 
-  if (res.statusCode < 200 || res.statusCode >= 300) {
+    if (res.statusCode < 200 || res.statusCode >= 300) {
       throw Exception('sync-table failed: ${res.statusCode}');
     }
   }
 
-// int変換（nullや文字でも落ちないように）
-int _toInt(dynamic v) {
-  if (v is int) return v;
-  if (v is double) return v.round();
-  if (v is String) return int.tryParse(v) ?? 0;
-  return 0;
-}
+  // int変換（nullや文字でも落ちないように）
+  int _toInt(dynamic v) {
+    if (v is int) return v;
+    if (v is double) return v.round();
+    if (v is String) return int.tryParse(v) ?? 0;
+    return 0;
+  }
 
   // ===================
   // ★ タイマー関連
   // ===================
- TableTimerInfo? timerOf(String table) => tableTimers[table];
-
+  TableTimerInfo? timerOf(String table) => tableTimers[table];
 
   DateTime? _resolveStartDateTime(String? hhmm, {DateTime? now}) {
     if (hhmm == null || hhmm.isEmpty) return null;
@@ -632,109 +641,106 @@ int _toInt(dynamic v) {
         .subtract(const Duration(days: 1))
         .add(Duration(seconds: safeTotal));
 
-    final candidates = [endToday, endPrevDay]
-        .where((end) => !end.isBefore(current))
-        .toList()
-      ..sort();
+    final candidates = [
+      endToday,
+      endPrevDay,
+    ].where((end) => !end.isBefore(current)).toList()..sort();
 
     if (candidates.isEmpty) return 0;
 
     final remaining = candidates.first.difference(current).inSeconds;
     return remaining < 0 ? 0 : remaining;
   }
-// ===================
-// ★ 互換：開始時刻だけ更新（呼び出し側がこれを使っている）
-// ===================
-void setTableTimerStartTime({
-  required String table,
-  required String startTime,
-}) {
-  final info = tableTimers[table];
-  if (info == null) {
+
+  // ===================
+  // ★ 互換：開始時刻だけ更新（呼び出し側がこれを使っている）
+  // ===================
+  void setTableTimerStartTime({
+    required String table,
+    required String startTime,
+  }) {
+    final info = tableTimers[table];
+    if (info == null) {
+      tableTimers[table] = TableTimerInfo(
+        remainingSeconds: 0,
+        totalSeconds: 0, // ★ 追加
+        autoExtend: false,
+        startTime: startTime,
+      );
+    } else {
+      info.startTime = startTime;
+    }
+
+    _saveTimersOnly();
+    notifyListeners();
+  }
+
+  ////////////////////////// ===================
+  ///
+  ///// ===================
+  // ★ 互換：時間の加減（＋ / − ボタン用）
+  // ===================
+  void adjustTableTimerMinutes({String? table, int minutes = 0}) {
+    if (table == null || minutes == 0) return;
+
+    final info = tableTimers[table];
+    if (info == null) return;
+
+    info.remainingSeconds += minutes * 60;
+
+    if (info.remainingSeconds < 0) {
+      info.remainingSeconds = 0;
+    }
+
+    // ★ 追加：±ボタンで変えたらtotalSecondsも同期（終了時刻がずれないように）
+    info.totalSeconds = info.remainingSeconds;
+
+    _saveTimersOnly();
+    notifyListeners();
+  }
+
+  // ===================
+  // ★ タイマー開始 / 更新（互換対応版）
+  // ===================
+  void startTableTimer({
+    required String table,
+
+    // ★ UI 側の呼び方違いを吸収する
+    int? remainingSeconds,
+    int? totalSeconds,
+
+    required bool autoExtend,
+    String? startTime,
+  }) {
+    final prev = tableTimers[table];
+
+    // どれが来ても秒数を決定
+    var seconds =
+        remainingSeconds ?? totalSeconds ?? prev?.remainingSeconds ?? 0;
+
+    // ★ totalSecondsは「設定した総秒数」として保存（終了時刻計算に使う）
+    final total = totalSeconds ?? seconds;
+
+    if (!autoExtend && total > 0) {
+      seconds = _calcRemainingSecondsFromClock(
+        startTime: startTime ?? prev?.startTime,
+        totalSeconds: total,
+      );
+    }
+
     tableTimers[table] = TableTimerInfo(
-      remainingSeconds: 0,
-      totalSeconds: 0, // ★ 追加
-      autoExtend: false,
-      startTime: startTime,
-    );
-  } else {
-    info.startTime = startTime;
-  }
-
-  _saveTimersOnly();
-  notifyListeners();
-}
-
-////////////////////////// ===================
-///
-///// ===================
-// ★ 互換：時間の加減（＋ / − ボタン用）
-// ===================
-void adjustTableTimerMinutes({
-  String? table,
-  int minutes = 0,
-}) {
-  if (table == null || minutes == 0) return;
-
-  final info = tableTimers[table];
-  if (info == null) return;
-
-  info.remainingSeconds += minutes * 60;
-
-  if (info.remainingSeconds < 0) {
-    info.remainingSeconds = 0;
-  }
-
-  // ★ 追加：±ボタンで変えたらtotalSecondsも同期（終了時刻がずれないように）
-  info.totalSeconds = info.remainingSeconds;
-
-  _saveTimersOnly();
-  notifyListeners();
-}
-
-// ===================
-// ★ タイマー開始 / 更新（互換対応版）
-// ===================
-void startTableTimer({
-  required String table,
-
-  // ★ UI 側の呼び方違いを吸収する
-  int? remainingSeconds,
-  int? totalSeconds,
-
-  required bool autoExtend,
-  String? startTime,
-}) {
-  final prev = tableTimers[table];
-
-  // どれが来ても秒数を決定
-  var seconds =
-      remainingSeconds ?? totalSeconds ?? prev?.remainingSeconds ?? 0;
-
-  // ★ totalSecondsは「設定した総秒数」として保存（終了時刻計算に使う）
-  final total = totalSeconds ?? seconds;
-
-  if (!autoExtend && total > 0) {
-    seconds = _calcRemainingSecondsFromClock(
+      remainingSeconds: seconds < 0 ? 0 : seconds,
+      totalSeconds: total < 0 ? 0 : total, // ★ 追加
+      autoExtend: autoExtend,
       startTime: startTime ?? prev?.startTime,
-      totalSeconds: total,
     );
+
+    _ensureGlobalTimer();
+    _saveTimersOnly();
+    notifyListeners();
   }
 
-  tableTimers[table] = TableTimerInfo(
-    remainingSeconds: seconds < 0 ? 0 : seconds,
-    totalSeconds: total < 0 ? 0 : total, // ★ 追加
-    autoExtend: autoExtend,
-    startTime: startTime ?? prev?.startTime,
-  );
-
-  _ensureGlobalTimer();
-  _saveTimersOnly();
-  notifyListeners();
-}
-
-
- void clearTableTimer(String table) {
+  void clearTableTimer(String table) {
     if (tableTimers.remove(table) != null) {
       _saveTimersOnly(); // ★ 消したら保存
       notifyListeners();
@@ -797,7 +803,7 @@ void startTableTimer({
     }
 
     // ★ 復元後にグローバルタイマーを確実に動かす
-   if (tableTimers.isNotEmpty) {
+    if (tableTimers.isNotEmpty) {
       _ensureGlobalTimer();
     }
 
@@ -874,10 +880,7 @@ void startTableTimer({
       _keyOrders,
       jsonEncode(_orders.map((o) => o.toJson()).toList()),
     );
-    await prefs.setStringList(
-      _keyActive,
-      _activeTables.toList(),
-    );
+    await prefs.setStringList(_keyActive, _activeTables.toList());
 
     // ★ タイマーも一緒に保存（外部に影響しない）
     await prefs.setString(
@@ -920,26 +923,25 @@ void startTableTimer({
     return true;
   }
 
-Future<bool> _endTableOnServer(String table) async {
-  try {
+  Future<bool> _endTableOnServer(String table) async {
+    try {
       final uri = ServerConfig.api('/api/rt/tables/$table/end');
 
+      final res = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+      );
 
-    final res = await http.post(
-      uri,
-      headers: {'Content-Type': 'application/json'},
-    );
-
-    if (res.statusCode < 200 || res.statusCode >= 300) {
-      debugPrint('END TABLE FAILED ${res.statusCode}');
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        debugPrint('END TABLE FAILED ${res.statusCode}');
+        return false;
+      }
+      return true;
+    } catch (e) {
+      debugPrint('END TABLE ERROR: $e');
       return false;
     }
-    return true;
-  } catch (e) {
-    debugPrint('END TABLE ERROR: $e');
-    return false;
   }
-}
 
   Future<bool> endTable(String table) async {
     final ended = await _endTableOnServer(table);
@@ -962,156 +964,156 @@ Future<bool> _endTableOnServer(String table) async {
   // ===================
   // Cart → Order
   // ===================
-Future<bool> addFromCart(
-  CartState cart,
-  String table,
-) async {
-  _lastSubmitError = null;
-  _lastSubmitStatusCode = null;
+  Future<bool> addFromCart(CartState cart, String table) async {
+    _lastSubmitError = null;
+    _lastSubmitStatusCode = null;
 
-  if (_orderSubmitInProgress) {
-    _lastSubmitError = 'order_in_progress';
-    notifyListeners();
-    return false;
-  }
-
-  if (!canSubmitOrders) {
-    _lastSubmitError = 'resync_required';
-    return false;
-  }
-
-  if (!canOrderTable(table)) {
-    // 初回注文などでテーブルがまだ ordering でない場合は、
-    // 先に開始リクエストを送ってから注文を試みる。
-    await _startTableOnServer(table);
-    _activeTables.add(table);
-    realtimeTableStatus[table] = 'ordering';
-
-    final rt = realtimeTables[table];
-    if (rt is Map<String, dynamic>) {
-      rt['status'] = 'ordering';
-      realtimeTables[table] = rt;
+    if (_orderSubmitInProgress) {
+      _lastSubmitError = 'order_in_progress';
+      notifyListeners();
+      return false;
     }
-  }
 
-  if (!canOrderTable(table)) {
-    _lastSubmitError = 'table_not_ordering';
-    return false;
-  }
-  if (cart.items.isEmpty) {
-    _lastSubmitError = 'cart_empty';
-    return false;
-  }
+    if (!canSubmitOrders) {
+      _lastSubmitError = 'resync_required';
+      return false;
+    }
 
-  _orderSubmitInProgress = true;
-  notifyListeners();
+    if (!canOrderTable(table)) {
+      // 初回注文などでテーブルがまだ ordering でない場合は、
+      // 先に開始リクエストを送ってから注文を試みる。
+      await _startTableOnServer(table);
+      _activeTables.add(table);
+      realtimeTableStatus[table] = 'ordering';
 
-  try {
-    var order = orderOf(table);
-     final bool createdOrder = order == null;
-    List<OrderLine>? previousLines;
-if (order == null) {
-  order = Order(
-    id: DateTime.now().millisecondsSinceEpoch.toString(),
-    table: table,
-    createdAt: DateTime.now(),
-    lines: [],
-  );
-  _orders.add(order);
-  } else {
-  previousLines = order.lines.map((l) => l.copyWith()).toList();
-}
+      final rt = realtimeTables[table];
+      if (rt is Map<String, dynamic>) {
+        rt['status'] = 'ordering';
+        realtimeTables[table] = rt;
+      }
+    }
 
+    if (!canOrderTable(table)) {
+      _lastSubmitError = 'table_not_ordering';
+      return false;
+    }
+    if (cart.items.isEmpty) {
+      _lastSubmitError = 'cart_empty';
+      return false;
+    }
 
-     final List<OrderLine> deltaLines = [];
-    for (final item in cart.items) {
-      deltaLines.add(
-        OrderLine(
-          category: item.category,
-          brand: item.brand,
-          label: item.label,
-          price: item.price,
-          qty: item.qty,
-          section: 'フロア',
-          subCategory: '',
-          shouldPrint: true,
-          printGroup: item.printGroup,
-        ),
-      );
+    _orderSubmitInProgress = true;
+    notifyListeners();
 
-      final idx = order.lines.indexWhere(
-        (l) =>
-            l.category == item.category &&
-            l.brand == item.brand &&
-            l.label == item.label &&
-            l.price == item.price,
-      );
-
-      if (idx >= 0) {
-        final cur = order.lines[idx];
-        order.lines[idx] = cur.copyWith(qty: cur.qty + item.qty);
+    try {
+      var order = orderOf(table);
+      final bool createdOrder = order == null;
+      List<OrderLine>? previousLines;
+      if (order == null) {
+        order = Order(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          table: table,
+          createdAt: DateTime.now(),
+          lines: [],
+        );
+        _orders.add(order);
       } else {
-        order.lines.add(
+        previousLines = order.lines.map((l) => l.copyWith()).toList();
+      }
+
+      final List<OrderLine> deltaLines = [];
+      for (final item in cart.items) {
+        deltaLines.add(
           OrderLine(
             category: item.category,
             brand: item.brand,
             label: item.label,
             price: item.price,
             qty: item.qty,
-           section: 'フロア',
+            section: 'フロア',
             subCategory: '',
             shouldPrint: true,
             printGroup: item.printGroup,
           ),
         );
+
+        final idx = order.lines.indexWhere(
+          (l) =>
+              l.category == item.category &&
+              l.brand == item.brand &&
+              l.label == item.label &&
+              l.price == item.price,
+        );
+
+        if (idx >= 0) {
+          final cur = order.lines[idx];
+          order.lines[idx] = cur.copyWith(qty: cur.qty + item.qty);
+        } else {
+          order.lines.add(
+            OrderLine(
+              category: item.category,
+              brand: item.brand,
+              label: item.label,
+              price: item.price,
+              qty: item.qty,
+              section: 'フロア',
+              subCategory: '',
+              shouldPrint: true,
+              printGroup: item.printGroup,
+            ),
+          );
+        }
       }
-    }
       // ✅ ここを追加
 
-    final sent = await sendOrderToServer(order, linesToSend: deltaLines);
-  if (!sent) {
-     if (createdOrder) {
-      _orders.removeWhere((o) => o.id == order!.id);
-    } else if (previousLines != null) {
-      order.lines
-        ..clear()
-        ..addAll(previousLines);
+      final requestId = cart.requestIdForTable(table);
+      final sent = await sendOrderToServer(
+        order,
+        linesToSend: deltaLines,
+        requestId: requestId,
+      );
+      if (!sent) {
+        if (createdOrder) {
+          _orders.removeWhere((o) => o.id == order!.id);
+        } else if (previousLines != null) {
+          order.lines
+            ..clear()
+            ..addAll(previousLines);
+        }
+        await _save();
+        notifyListeners();
+        return false;
+      }
+
+      cart.clear();
+      await _save();
+      notifyListeners();
+      return true;
+    } finally {
+      _orderSubmitInProgress = false;
+      notifyListeners();
     }
-    await _save();
-    notifyListeners();
-    return false;
   }
 
-    cart.clear();
-    await _save();
-    notifyListeners();
-    return true;
-  } finally {
-    _orderSubmitInProgress = false;
-    notifyListeners();
-  }
-  }
- Future<bool> _startTableOnServer(String table) async {
-  try {
-     final uri = ServerConfig.api('/api/rt/tables/$table/start');
+  Future<bool> _startTableOnServer(String table) async {
+    try {
+      final uri = ServerConfig.api('/api/rt/tables/$table/start');
 
+      final res = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+      );
 
-    final res = await http.post(
-      uri,
-      headers: {'Content-Type': 'application/json'},
-    );
-
-
-    if (res.statusCode < 200 || res.statusCode >= 300) {
-      debugPrint('START TABLE FAILED ${res.statusCode}');
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        debugPrint('START TABLE FAILED ${res.statusCode}');
+        return false;
+      }
+      return true;
+    } catch (e) {
+      debugPrint('START TABLE ERROR: $e');
       return false;
     }
-    return true;
-  } catch (e) {
-    debugPrint('START TABLE ERROR: $e');
-    return false;
   }
-}
 
   Future<bool> _moveTableOnServer({
     required String from,
@@ -1130,7 +1132,7 @@ if (order == null) {
     required String from,
     required String to,
   }) async {
-       final uri = ServerConfig.api('/api/rt/tables/merge');
+    final uri = ServerConfig.api('/api/rt/tables/merge');
     final res = await http.post(
       uri,
       headers: {'Content-Type': 'application/json'},
@@ -1142,10 +1144,7 @@ if (order == null) {
   // ===================
   // 注文明細操作
   // ===================
-  Future<bool> removeLine(
-    String orderId,
-    OrderLine line,
-  ) async {
+  Future<bool> removeLine(String orderId, OrderLine line) async {
     final o = _orders.firstWhere((o) => o.id == orderId);
     final previousLines = List<OrderLine>.from(o.lines);
 
@@ -1174,11 +1173,7 @@ if (order == null) {
   // ===================
   // 数量変更（+ / - 用）
   // ===================
-  Future<bool> updateQty(
-    String orderId,
-    OrderLine line,
-    int qty,
-  ) async {
+  Future<bool> updateQty(String orderId, OrderLine line, int qty) async {
     final oIdx = _orders.indexWhere((o) => o.id == orderId);
     if (oIdx == -1) return false;
 
@@ -1355,41 +1350,39 @@ if (order == null) {
     }
   }
 
-
   // ===================
   // 管理画面：直接注文追加（同一商品はqty合算）
   // ===================
-   Future<bool> addManual({
+  Future<bool> addManual({
     required String table,
     required String category,
     required String brand,
-   required String label,
-   required int price,
+    required String label,
+    required int price,
     String printGroup = 'kitchen',
     bool shouldPrint = true,
     String subCategory = '',
     int qty = 1,
     required String section,
-   }) async {
- _lastSubmitError = null;
-  _lastSubmitStatusCode = null;
+  }) async {
+    _lastSubmitError = null;
+    _lastSubmitStatusCode = null;
 
-  if (!canSubmitOrders) {
-    _lastSubmitError = 'resync_required';
-    return false;
-  }
+    if (!canSubmitOrders) {
+      _lastSubmitError = 'resync_required';
+      return false;
+    }
 
-  if (!canOrderTable(table)) {
-    _lastSubmitError = 'table_not_ordering';
-    return false;
-  }
-   if (qty <= 0) {
-    _lastSubmitError = 'invalid_qty';
-    return false;
-   }
+    if (!canOrderTable(table)) {
+      _lastSubmitError = 'table_not_ordering';
+      return false;
+    }
+    if (qty <= 0) {
+      _lastSubmitError = 'invalid_qty';
+      return false;
+    }
 
-
-     final deltaLine = OrderLine(
+    final deltaLine = OrderLine(
       category: category,
       brand: brand,
       label: label,
@@ -1401,18 +1394,20 @@ if (order == null) {
       printGroup: printGroup,
     );
 
-   
     final requestOrder = Order(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       table: table,
       createdAt: DateTime.now(),
       lines: const [],
     );
-   final sent = await sendOrderToServer(requestOrder, linesToSend: [deltaLine]);
+    final sent = await sendOrderToServer(
+      requestOrder,
+      linesToSend: [deltaLine],
+    );
     if (!sent) {
       return false;
     }
-   
+
     return true;
   }
 
@@ -1430,10 +1425,7 @@ if (order == null) {
   // ===================
   // 席移動：注文を別テーブルへ移す
   // ===================
-  Future<void> moveTable({
-    required String from,
-    required String to,
-  }) async {
+  Future<void> moveTable({required String from, required String to}) async {
     if (from == to) return;
 
     final fromOrder = orderOf(from);
@@ -1443,7 +1435,7 @@ if (order == null) {
     final toOrder = orderOf(to);
     if (toOrder != null && toOrder.lines.isNotEmpty) return;
 
-   // 既存の移動先注文（空注文など）があれば削除
+    // 既存の移動先注文（空注文など）があれば削除
     if (toOrder != null) {
       _orders.removeWhere((o) => o.table == to);
     }
@@ -1466,10 +1458,7 @@ if (order == null) {
   // ===================
   // 席合算：from の注文を to に合算
   // ===================
-  Future<void> mergeTables({
-    required String from,
-    required String to,
-  }) async {
+  Future<void> mergeTables({required String from, required String to}) async {
     if (from == to) return;
 
     final fromOrder = orderOf(from);
@@ -1521,7 +1510,7 @@ if (order == null) {
   // ===================
   // テーブル追加
   // ===================
-   Future<void> addTable(String name) async {
+  Future<void> addTable(String name) async {
     final n = name.trim();
     if (n.isEmpty) return;
     if (_tables.contains(n)) return;
@@ -1583,7 +1572,7 @@ if (order == null) {
   // ===================
   // サーバー送信（必要なら呼び出し側で利用）
   // ===================
- String _nextRequestId() {
+  String _nextRequestId() {
     const max = 0x7fffffff;
     debugPrint('REQID START max=$max');
     final n = Random().nextInt(max);
@@ -1595,6 +1584,7 @@ if (order == null) {
   Future<bool> sendOrderToServer(
     Order order, {
     List<OrderLine>? linesToSend,
+    String? requestId,
   }) async {
     debugPrint('SEND ORDER START'); // ← これを追加
     _lastSubmitStatusCode = null;
@@ -1602,14 +1592,14 @@ if (order == null) {
       if (!canSubmitOrders) {
         _lastSubmitError = 'resync_required';
         return false;
-       }
-        final uri = ServerConfig.api('/api/orders');
+      }
+      final uri = ServerConfig.api('/api/orders');
       final lines = linesToSend ?? order.lines;
       debugPrint('SEND ORDER PHASE 1 uri=$uri lines=${lines.length}');
 
-      late final String requestId;
+      late final String resolvedRequestId;
       try {
-        requestId = _nextRequestId();
+        resolvedRequestId = requestId ?? _nextRequestId();
       } catch (e, st) {
         debugPrint('SEND ORDER FAIL PHASE=requestId error=$e');
         debugPrint('$st');
@@ -1618,10 +1608,7 @@ if (order == null) {
 
       late final List<Map<String, dynamic>> items;
       try {
-        items = lines
-            
-            .map((l) => l.toServerItem())
-            .toList();
+        items = lines.map((l) => l.toServerItem()).toList();
       } catch (e, st) {
         debugPrint('SEND ORDER FAIL PHASE=toServerItem error=$e');
         debugPrint('$st');
@@ -1629,7 +1616,7 @@ if (order == null) {
       }
 
       final payload = {
-        'requestId': requestId,
+        'requestId': resolvedRequestId,
         'tableId': order.table,
         'orderedBy': order.table.startsWith('C') ? 'guest' : 'owner',
         'items': items,
@@ -1644,15 +1631,13 @@ if (order == null) {
         rethrow;
       }
 
-      final res = await http.post(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-        body: body,
-      );
+      final res = await http
+          .post(uri, headers: {'Content-Type': 'application/json'}, body: body)
+          .timeout(const Duration(seconds: 15));
 
       debugPrint('RES /api/orders status=${res.statusCode}');
 
-     if (res.statusCode != 200) {
+      if (res.statusCode != 200) {
         _lastSubmitError = 'server_rejected';
         _lastSubmitStatusCode = res.statusCode;
         throw Exception('order send failed');
@@ -1660,38 +1645,35 @@ if (order == null) {
       _lastSubmitError = null;
       return true;
     } catch (e) {
-  _lastSubmitError ??= 'network_or_exception';
-  debugPrint('SEND ORDER ERROR: $e');
-}
+      _lastSubmitError ??= 'network_or_exception';
+      debugPrint('SEND ORDER ERROR: $e');
+    }
     return false;
   }
 
   // ★ ステップ④：グローバルタイマー起動
   void _ensureGlobalTimer() {
-    _globalTimer ??= Timer.periodic(
-      const Duration(seconds: 1),
-      (_) {
-        bool changed = false;
+    _globalTimer ??= Timer.periodic(const Duration(seconds: 1), (_) {
+      bool changed = false;
 
-       tableTimers.forEach((table, info) {
-          if (!info.autoExtend) {
-            final next = _calcRemainingSecondsFromClock(
-              startTime: info.startTime,
-              totalSeconds: info.totalSeconds,
-            );
-            if (next != info.remainingSeconds) {
-              info.remainingSeconds = next;
-              changed = true;
-            }
+      tableTimers.forEach((table, info) {
+        if (!info.autoExtend) {
+          final next = _calcRemainingSecondsFromClock(
+            startTime: info.startTime,
+            totalSeconds: info.totalSeconds,
+          );
+          if (next != info.remainingSeconds) {
+            info.remainingSeconds = next;
+            changed = true;
           }
-        });
-
-        if (changed) {
-          // ★ 減った秒数を保存（アプリ落ちても復元できる）
-          _saveTimersOnly();
-          notifyListeners();
         }
-      },
-    );
+      });
+
+      if (changed) {
+        // ★ 減った秒数を保存（アプリ落ちても復元できる）
+        _saveTimersOnly();
+        notifyListeners();
+      }
+    });
   }
 }

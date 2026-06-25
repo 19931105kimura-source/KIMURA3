@@ -148,6 +148,7 @@ applyPrinterSettingsToEnv(readPrinterSettings());
 
 // requestId 冪等化（重複注文防止）
 const processedOrderRequests = new Map(); // requestId -> response payload
+const pendingOrderRequests = new Map(); // requestId -> { promise, resolve, expiresAt }
 const REQUEST_TTL_MS = 1000 * 60 * 30;
 
 
@@ -168,10 +169,43 @@ function getRememberedOrderRequest(requestId) {
   return e.payload;
 }
 
+function createPendingOrderRequest(requestId) {
+  let resolve;
+  const promise = new Promise((done) => {
+    resolve = done;
+  });
+  pendingOrderRequests.set(requestId, {
+    promise,
+    resolve,
+    expiresAt: Date.now() + REQUEST_TTL_MS,
+  });
+  return {
+    resolve: (status, payload) => {
+      if (pendingOrderRequests.has(requestId)) {
+        resolve({ status, payload });
+        pendingOrderRequests.delete(requestId);
+      }
+    },
+  };
+}
+
+function getPendingOrderRequest(requestId) {
+  const e = pendingOrderRequests.get(requestId);
+  if (!e) return null;
+  if (e.expiresAt < Date.now()) {
+    pendingOrderRequests.delete(requestId);
+    return null;
+  }
+  return e.promise;
+}
+
 setInterval(() => {
   const now = Date.now();
   for (const [key, value] of processedOrderRequests.entries()) {
     if (value.expiresAt < now) processedOrderRequests.delete(key);
+  }
+  for (const [key, value] of pendingOrderRequests.entries()) {
+    if (value.expiresAt < now) pendingOrderRequests.delete(key);
   }
 }, 60 * 1000);
 
@@ -1481,6 +1515,16 @@ app.post("/api/promos/delete-file", (req, res) => {
   }
 
  // ★ 注文確定時：テーブルは必ず「開始中」にする（正本）
+let pendingOrderRequest = null;
+if (requestId) {
+  const pending = getPendingOrderRequest(requestId);
+  if (pending) {
+    const result = await pending;
+    return res.status(result.status).json(result.payload);
+  }
+  pendingOrderRequest = createPendingOrderRequest(requestId);
+}
+
 store.openTable(tableId);
 
 
@@ -1621,12 +1665,16 @@ try {
       tableId,
       requestId,
     });
-    return res.status(400).json({
+    const errorPayload = {
       ok: false,
       success: false,
       error: "order processing failed",
       details: [e?.message || "unknown error"],
-    });
+    };
+    if (pendingOrderRequest) {
+      pendingOrderRequest.resolve(400, errorPayload);
+    }
+    return res.status(400).json(errorPayload);
   }
 
    store.orderItemsByOrder.set(orderId, itemIds);
@@ -1680,6 +1728,9 @@ try {
   };
   if (requestId) {
     rememberOrderRequest(requestId, responsePayload);
+  }
+  if (pendingOrderRequest) {
+    pendingOrderRequest.resolve(200, responsePayload);
   }
 
   res.json(responsePayload);
