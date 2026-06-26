@@ -4,6 +4,45 @@ import 'package:flutter/material.dart';
 import '../services/websocket_service.dart';
 import 'order_state.dart';
 
+class PrintFailureNotice {
+  final String id;
+  final String tableId;
+  final String targetLabel;
+  final List<String> itemNames;
+  final String message;
+  final DateTime? at;
+
+  const PrintFailureNotice({
+    required this.id,
+    required this.tableId,
+    required this.targetLabel,
+    required this.itemNames,
+    required this.message,
+    required this.at,
+  });
+
+  factory PrintFailureNotice.fromJson(Map<String, dynamic> json) {
+    final rawItems = json['itemNames'];
+    return PrintFailureNotice(
+      id: (json['id'] ?? '').toString(),
+      tableId: (json['tableId'] ?? '').toString(),
+      targetLabel: (json['targetLabel'] ?? json['target'] ?? '').toString(),
+      itemNames: rawItems is List
+          ? rawItems
+                .map((e) => e.toString())
+                .where((e) => e.isNotEmpty)
+                .toList()
+          : const [],
+      message: (json['message'] ?? '').toString(),
+      at: DateTime.tryParse((json['at'] ?? '').toString()),
+    );
+  }
+
+  String get itemSummary => itemNames.isEmpty ? '商品名不明' : itemNames.join('、');
+
+  String get announceText => '印刷に失敗しました。席$tableId、$targetLabel、$itemSummary。';
+}
+
 class RealtimeState extends ChangeNotifier with WidgetsBindingObserver {
   final OrderState orderState;
   final WebSocketService _ws = WebSocketService();
@@ -29,6 +68,7 @@ class RealtimeState extends ChangeNotifier with WidgetsBindingObserver {
   Map<String, dynamic> tables = {};
   Map<String, dynamic> ordersByTable = {};
   Map<String, dynamic> orderItems = {};
+  List<PrintFailureNotice> printFailures = const [];
 
   void applySnapshot(Map<String, dynamic> payload) {
     debugPrint('SNAPSHOT RECEIVED');
@@ -42,6 +82,17 @@ class RealtimeState extends ChangeNotifier with WidgetsBindingObserver {
     tables = Map<String, dynamic>.from(payload['tables'] ?? {});
     ordersByTable = Map<String, dynamic>.from(payload['ordersByTable'] ?? {});
     orderItems = Map<String, dynamic>.from(payload['orderItems'] ?? {});
+    final rawPrintFailures = payload['printFailures'];
+    printFailures = rawPrintFailures is List
+        ? rawPrintFailures
+              .whereType<Map>()
+              .map(
+                (e) =>
+                    PrintFailureNotice.fromJson(Map<String, dynamic>.from(e)),
+              )
+              .where((e) => e.id.isNotEmpty)
+              .toList()
+        : const [];
 
     orderState.applyRealtimeSnapshot(payload);
     notifyListeners();

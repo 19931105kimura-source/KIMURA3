@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../state/order_state.dart';
+
+import '../../billing/billing_calculator.dart';
 import '../state/app_state.dart';
+import '../state/order_state.dart';
+import '../state/realtime_state.dart';
+import '../utils/order_sort.dart';
+import '../utils/price_format.dart';
+import '../utils/print_failure_announcer.dart';
 import 'login_page.dart';
 import 'owner_table_center_panel.dart';
-import '../../billing/billing_calculator.dart';
-import '../utils/price_format.dart';
-import '../utils/order_sort.dart';
-import '../state/realtime_state.dart';
 
 class OwnerTablePage extends StatefulWidget {
   const OwnerTablePage({super.key});
@@ -18,25 +20,69 @@ class OwnerTablePage extends StatefulWidget {
 
 class _OwnerTablePageState extends State<OwnerTablePage> {
   bool _editMode = false;
-  @override
-void initState() {
-  super.initState();
+  RealtimeState? _rtState;
+  final Set<String> _announcedPrintFailureIds = {};
+  bool _printFailureIdsInitialized = false;
 
-  // ★ オーナーモード用：Realtime 接続開始
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    context.read<RealtimeState>().connect();
-    context.read<OrderState>().refreshTablesFromServer();
-  });
-}
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<RealtimeState>().connect();
+      context.read<OrderState>().refreshTablesFromServer();
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final next = context.read<RealtimeState>();
+    if (_rtState == next) return;
+    _rtState?.removeListener(_handlePrintFailures);
+    _rtState = next;
+    _rtState?.addListener(_handlePrintFailures);
+  }
+
+  @override
+  void dispose() {
+    _rtState?.removeListener(_handlePrintFailures);
+    super.dispose();
+  }
+
+  void _handlePrintFailures() {
+    final failures = _rtState?.printFailures ?? const <PrintFailureNotice>[];
+    if (!_printFailureIdsInitialized) {
+      _announcedPrintFailureIds.addAll(failures.map((e) => e.id));
+      _printFailureIdsInitialized = true;
+      return;
+    }
+
+    final newFailures =
+        failures
+            .where((failure) => !_announcedPrintFailureIds.contains(failure.id))
+            .toList()
+          ..sort((a, b) {
+            final aTime = a.at ?? DateTime.fromMillisecondsSinceEpoch(0);
+            final bTime = b.at ?? DateTime.fromMillisecondsSinceEpoch(0);
+            return aTime.compareTo(bTime);
+          });
+
+    for (final failure in newFailures) {
+      _announcedPrintFailureIds.add(failure.id);
+      announcePrintFailure(failure.announceText);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final orderState = context.watch<OrderState>();
+    final rtState = context.watch<RealtimeState>();
     final tables = orderState.tables;
+    final printFailures = rtState.printFailures;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('テーブル管理'),
+        title: const Text('席管理'),
         actions: [
           IconButton(
             tooltip: _editMode ? '編集モードを終了' : '編集モード',
@@ -65,9 +111,9 @@ void initState() {
                 ),
               );
 
+              if (!context.mounted) return;
               if (ok == true) {
                 context.read<AppState>().logout();
-                if (!mounted) return;
                 Navigator.pushAndRemoveUntil(
                   context,
                   MaterialPageRoute(builder: (_) => const LoginPage()),
@@ -78,49 +124,58 @@ void initState() {
           ),
         ],
       ),
-
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _addTable(context),
         icon: const Icon(Icons.add),
-        label: const Text('テーブル追加'),
+        label: const Text('席を追加'),
       ),
-
       body: Padding(
         padding: const EdgeInsets.all(50),
-        child: GridView.builder(
-          itemCount: tables.length,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 4,
-            crossAxisSpacing: 35,
-            mainAxisSpacing: 35,
-            childAspectRatio: 1.10,
-          ),
-          itemBuilder: (context, index) {
-           
-           final table = tables[index];
-            final isActive = orderState.isActive(table);
-            final hasOrder = orderState.hasOrder(table);
-            final order = orderState.realtimeOrderForDisplay(table);
+        child: Column(
+          children: [
+            if (printFailures.isNotEmpty) ...[
+              _PrintFailureBanner(failures: printFailures.take(5).toList()),
+              const SizedBox(height: 20),
+            ],
+            Expanded(
+              child: GridView.builder(
+                itemCount: tables.length,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 4,
+                  crossAxisSpacing: 35,
+                  mainAxisSpacing: 35,
+                  childAspectRatio: 1.10,
+                ),
+                itemBuilder: (context, index) {
+                  final table = tables[index];
+                  final isActive = orderState.isActive(table);
+                  final hasOrder = orderState.hasOrder(table);
+                  final order = orderState.realtimeOrderForDisplay(table);
+                  final total = order == null
+                      ? 0
+                      : BillingCalculator.calculateFromLines(
+                          sortOrderLines(order.lines),
+                        ).total;
 
-
-            final total = order == null
-                ? 0
-                : BillingCalculator.calculateFromLines(
-                    sortOrderLines(order.lines),
-                  ).total;
-
-
-            return _TableBigNumberCard(
-              table: table,
-              isActive: isActive,
-              hasOrder: hasOrder,
-              total: total,
-              editMode: _editMode,
-              onTap: () => _openTableDialog(context, table),
-              onRename: () => _renameTable(context, table),
-              onDelete: hasOrder ? null : () => orderState.removeTable(table),
-            );         
-          },
+                  return _TableBigNumberCard(
+                    table: table,
+                    isActive: isActive,
+                    hasOrder: hasOrder,
+                    total: total,
+                    editMode: _editMode,
+                    hasPrintFailure: printFailures.any(
+                      (failure) => failure.tableId == table,
+                    ),
+                    onTap: () => _openTableDialog(context, table),
+                    onRename: () => _renameTable(context, table),
+                    onDelete: hasOrder
+                        ? null
+                        : () => orderState.removeTable(table),
+                  );
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -132,10 +187,10 @@ void initState() {
     final name = await showDialog<String>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('テーブル追加'),
+        title: const Text('席を追加'),
         content: TextField(
           controller: ctrl,
-          decoration: const InputDecoration(hintText: '例：A / VIP4'),
+          decoration: const InputDecoration(hintText: '例: T13 / VIP4'),
         ),
         actions: [
           TextButton(
@@ -150,7 +205,7 @@ void initState() {
       ),
     );
 
-    if (!mounted) return;
+    if (!context.mounted) return;
     if (name != null && name.isNotEmpty) {
       context.read<OrderState>().addTable(name);
     }
@@ -162,7 +217,7 @@ void initState() {
     final newName = await showDialog<String>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('テーブル名変更'),
+        title: const Text('席名を変更'),
         content: TextField(controller: ctrl),
         actions: [
           TextButton(
@@ -177,22 +232,20 @@ void initState() {
       ),
     );
 
-    if (!mounted) return;
+    if (!context.mounted) return;
     if (newName != null && newName.isNotEmpty && newName != table) {
       context.read<OrderState>().renameTable(table, newName);
     }
   }
 }
 
-/// =======================
-/// テーブルカード
-/// =======================
 class _TableBigNumberCard extends StatelessWidget {
   final String table;
   final bool isActive;
   final bool hasOrder;
   final int total;
   final bool editMode;
+  final bool hasPrintFailure;
   final VoidCallback onTap;
   final VoidCallback onRename;
   final VoidCallback? onDelete;
@@ -203,6 +256,7 @@ class _TableBigNumberCard extends StatelessWidget {
     required this.hasOrder,
     required this.total,
     required this.editMode,
+    required this.hasPrintFailure,
     required this.onTap,
     required this.onRename,
     required this.onDelete,
@@ -260,14 +314,14 @@ class _TableBigNumberCard extends StatelessWidget {
                 padding: const EdgeInsets.only(bottom: 6),
                 child: isActive
                     ? Text(
-                        '???',
+                        '使用中',
                         style: TextStyle(
                           fontWeight: FontWeight.w800,
                           color: borderColor,
                         ),
                       )
                     : const Text(
-                        '??',
+                        '空席',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
@@ -283,12 +337,12 @@ class _TableBigNumberCard extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
-                      tooltip: '????',
+                      tooltip: '編集',
                       icon: const Icon(Icons.edit),
                       onPressed: onRename,
                     ),
                     IconButton(
-                      tooltip: hasOrder ? '?????????' : '??',
+                      tooltip: hasOrder ? '注文があるため削除できません' : '削除',
                       icon: Icon(
                         Icons.delete,
                         color: hasOrder ? Colors.grey : Colors.red,
@@ -298,8 +352,67 @@ class _TableBigNumberCard extends StatelessWidget {
                   ],
                 ),
               ),
+            if (hasPrintFailure && !editMode)
+              const Align(
+                alignment: Alignment.topRight,
+                child: Icon(
+                  Icons.warning_amber_rounded,
+                  color: Colors.red,
+                  size: 34,
+                ),
+              ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _PrintFailureBanner extends StatelessWidget {
+  final List<PrintFailureNotice> failures;
+
+  const _PrintFailureBanner({required this.failures});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.red.withValues(alpha: 0.14),
+        border: Border.all(color: Colors.redAccent, width: 2),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.volume_up, color: Colors.redAccent),
+              SizedBox(width: 8),
+              Text(
+                '印刷失敗',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.redAccent,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          for (final failure in failures)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                '席 ${failure.tableId} / ${failure.targetLabel} / ${failure.itemSummary}',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -311,13 +424,8 @@ void _openTableDialog(BuildContext context, String table) {
     barrierDismissible: true,
     builder: (_) => Dialog(
       insetPadding: const EdgeInsets.all(24),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: SizedBox(
-        width: 520,
-        child: OwnerTableCenterPanel(table: table),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: SizedBox(width: 520, child: OwnerTableCenterPanel(table: table)),
     ),
   );
 }

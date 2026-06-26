@@ -12,7 +12,6 @@ import '../utils/price_format.dart';
 import '../utils/confirm_order_deletion.dart';
 import '../state/realtime_state.dart';
 
-
 class OwnerTableCenterPanel extends StatefulWidget {
   final String table;
   const OwnerTableCenterPanel({super.key, required this.table});
@@ -35,10 +34,12 @@ class _OwnerTableCenterPanelState extends State<OwnerTableCenterPanel> {
     final rtTable = rtState.tables[widget.table] as Map<String, dynamic>?;
     final status = (rtTable?['status'] ?? '').toString();
     final isActive = status == 'ordering';
-
+    final printFailures = rtState.printFailures
+        .where((failure) => failure.tableId == widget.table)
+        .take(5)
+        .toList();
 
     debugPrint('RT TABLE ${widget.table} status = $status');
-
 
     final billing = displayOrder == null
         ? null
@@ -51,10 +52,7 @@ class _OwnerTableCenterPanelState extends State<OwnerTableCenterPanel> {
         children: [
           Text(
             widget.table,
-            style: const TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.bold,
-            ),
+            style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
           ),
 
           const SizedBox(height: 8),
@@ -66,6 +64,46 @@ class _OwnerTableCenterPanelState extends State<OwnerTableCenterPanel> {
               fontWeight: FontWeight.bold,
             ),
           ),
+
+          if (printFailures.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red.withValues(alpha: 0.14),
+                border: Border.all(color: Colors.redAccent, width: 1.5),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        color: Colors.redAccent,
+                      ),
+                      SizedBox(width: 8),
+                      Text(
+                        '印刷失敗',
+                        style: TextStyle(
+                          color: Colors.redAccent,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  for (final failure in printFailures)
+                    Text(
+                      '${failure.targetLabel} / ${failure.itemSummary}',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                ],
+              ),
+            ),
+          ],
 
           const Divider(height: 32),
 
@@ -92,17 +130,14 @@ class _OwnerTableCenterPanelState extends State<OwnerTableCenterPanel> {
                   alignment: Alignment.centerRight,
                   child: Text(
                     '内訳：税 ${formatYen(billing.taxAmount)} / サ ${formatYen(billing.serviceAmount)}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.white70,
-                    ),
+                    style: const TextStyle(fontSize: 12, color: Colors.white70),
                   ),
                 ),
               ],
             ],
           ),
 
-         const SizedBox(height: 16),
+          const SizedBox(height: 16),
           // ===== 注文一覧 =====
           if (displayOrder != null && displayOrder.lines.isNotEmpty)
             SizedBox(
@@ -192,10 +227,7 @@ class _OwnerTableCenterPanelState extends State<OwnerTableCenterPanel> {
               ),
             )
           else
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Text('注文はありません'),
-            ),
+            const Padding(padding: EdgeInsets.all(16), child: Text('注文はありません')),
 
           // ===== 操作ボタン =====
           Wrap(
@@ -205,17 +237,17 @@ class _OwnerTableCenterPanelState extends State<OwnerTableCenterPanel> {
             children: [
               ElevatedButton(
                 onPressed: isActive
-    ? null
-    : () async {
-        final ok = await orderState.startTable(widget.table);
-        if (!ok && context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('席を開始できませんでした。通信状態を確認してください。'),
-            ),
-          );
-        }
-      },
+                    ? null
+                    : () async {
+                        final ok = await orderState.startTable(widget.table);
+                        if (!ok && context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('席を開始できませんでした。通信状態を確認してください。'),
+                            ),
+                          );
+                        }
+                      },
 
                 child: const Text('注文開始'),
               ),
@@ -260,7 +292,10 @@ class _OwnerTableCenterPanelState extends State<OwnerTableCenterPanel> {
                           onlyWithOrder: true,
                         );
                         if (to == null) return;
-                        await orderState.mergeTables(from: widget.table, to: to);
+                        await orderState.mergeTables(
+                          from: widget.table,
+                          to: to,
+                        );
                         if (!mounted) return;
                         if (context.mounted) {
                           Navigator.pop(context);
@@ -270,7 +305,8 @@ class _OwnerTableCenterPanelState extends State<OwnerTableCenterPanel> {
               ),
 
               ElevatedButton(
-                onPressed: !_printing &&
+                onPressed:
+                    !_printing &&
                         orderData != null &&
                         orderData.lines.isNotEmpty
                     ? () async {
@@ -292,41 +328,39 @@ class _OwnerTableCenterPanelState extends State<OwnerTableCenterPanel> {
                     : const Text('伝票印刷'),
               ),
 
-            OutlinedButton(
-  onPressed: isActive
-      ? () async {
-          final ok = await orderState.endTable(widget.table);
-          if (ok) {
-            if (!context.mounted) return;
-            Navigator.pop(context);
-          } else if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('席を終了できませんでした。通信状態を確認してください。'),
+              OutlinedButton(
+                onPressed: isActive
+                    ? () async {
+                        final ok = await orderState.endTable(widget.table);
+                        if (ok) {
+                          if (!context.mounted) return;
+                          Navigator.pop(context);
+                        } else if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('席を終了できませんでした。通信状態を確認してください。'),
+                            ),
+                          );
+                        }
+                      }
+                    : null,
+                child: const Text('終了'),
               ),
-            );
-          }
-        }
-      : null,
-  child: const Text('終了'),
-),
 
-
-             TextButton(
+              TextButton(
                 onPressed: displayOrder != null && displayOrder.lines.isNotEmpty
                     ? () async {
                         final confirmed = await confirmOrderDeletion(context);
                         if (!confirmed || !context.mounted) return;
 
-                        final ok =
-                            await orderState.removeOrdersForTable(widget.table);
+                        final ok = await orderState.removeOrdersForTable(
+                          widget.table,
+                        );
                         if (!ok) {
                           if (!context.mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text(
-                                '注文削除の同期に失敗しました。再試行してください。',
-                              ),
+                              content: Text('注文削除の同期に失敗しました。再試行してください。'),
                             ),
                           );
                           return;
@@ -346,10 +380,7 @@ class _OwnerTableCenterPanelState extends State<OwnerTableCenterPanel> {
                         Navigator.pop(context);
                       }
                     : null,
-                child: const Text(
-                  '注文削除',
-                  style: TextStyle(color: Colors.red),
-                ),
+                child: const Text('注文削除', style: TextStyle(color: Colors.red)),
               ),
 
               TextButton(
@@ -362,9 +393,6 @@ class _OwnerTableCenterPanelState extends State<OwnerTableCenterPanel> {
       ),
     );
   }
-
-  
-
 
   // ===== テーブル選択ダイアログ =====
   Future<String?> _selectTableDialog(
@@ -425,13 +453,13 @@ class _OwnerTableCenterPanelState extends State<OwnerTableCenterPanel> {
       final data = jsonDecode(res.body);
       if (data['success'] != true) throw Exception('print failed');
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('会計伝票を印刷しました')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('会計伝票を印刷しました')));
     } catch (_) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('印刷に失敗しました')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('印刷に失敗しました')));
     } finally {
       if (mounted) setState(() => _printing = false);
     }

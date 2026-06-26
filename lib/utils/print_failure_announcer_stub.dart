@@ -1,0 +1,1 @@
+void announcePrintFailure(String message) {}

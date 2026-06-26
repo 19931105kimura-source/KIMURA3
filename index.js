@@ -414,6 +414,41 @@ function shouldPrintToTarget(item, target) {
   );
 }
 
+const printFailures = [];
+const MAX_PRINT_FAILURES = 50;
+
+function printTargetLabel(target) {
+  const normalizedTarget = normalizePrintTarget(target);
+  if (normalizedTarget === "register") return "レジ";
+  if (normalizedTarget === "kitchen") return "厨房";
+  return normalizedTarget;
+}
+
+function recordPrintFailure({ tableId, target, items, error }) {
+  const failedItems = Array.isArray(items) ? items : [];
+  const itemNames = failedItems
+    .map((item) => printableItemName(item))
+    .filter((name) => name && name !== "unknown");
+  const uniqueItemNames = [...new Set(itemNames)];
+  const at = new Date().toISOString();
+  const entry = {
+    id: `print_failed_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
+    at,
+    tableId,
+    target: normalizePrintTarget(target),
+    targetLabel: printTargetLabel(target),
+    itemNames: uniqueItemNames,
+    message: error?.message || String(error || "print failed"),
+  };
+
+  printFailures.unshift(entry);
+  if (printFailures.length > MAX_PRINT_FAILURES) {
+    printFailures.length = MAX_PRINT_FAILURES;
+  }
+
+  return entry;
+}
+
 function readIntEnv(name, fallback) {
   const n = Number(process.env[name]);
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
@@ -1703,17 +1738,24 @@ try {
   );
 
   for (const target of printTargets) {
+    const targetItems = printDeltaItems.filter((item) =>
+      shouldPrintToTarget(item, target) &&
+      item.shouldPrint !== false
+    );
     try {
       await printOrderSlip({
         tableId,
         target,
-        items: printDeltaItems.filter((item) =>
-          shouldPrintToTarget(item, target) &&
-          item.shouldPrint !== false
-        ),
+        items: targetItems,
       });
     } catch (e) {
       console.error("ORDER AUTO PRINT ERROR:", e);
+      recordPrintFailure({
+        tableId,
+        target,
+        items: targetItems,
+        error: e,
+      });
     }
   }
 
@@ -1767,9 +1809,11 @@ app.post('/api/orders/sync-table', (req, res) => {
 // snapshot 作成（RT 正本）
 // =========================
 function buildSnapshot() {
+  const payload = store.buildRealtimeSnapshot();
+  payload.printFailures = printFailures;
   return {
     type: "snapshot",
-    payload: store.buildRealtimeSnapshot(), // ★ ここが正本
+    payload, // ★ ここが正本
   };
 }
 
