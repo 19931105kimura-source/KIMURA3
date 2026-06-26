@@ -630,6 +630,37 @@ async function printOrderSlip({ tableId, target, items }) {
   return { printed: printableItems.length, target: normalizedTarget };
 }
 
+async function runOrderAutoPrint({ tableId, printTargets, printDeltaItems }) {
+  let hasFailure = false;
+
+  for (const target of printTargets) {
+    const targetItems = printDeltaItems.filter((item) =>
+      shouldPrintToTarget(item, target) &&
+      item.shouldPrint !== false
+    );
+    try {
+      await printOrderSlip({
+        tableId,
+        target,
+        items: targetItems,
+      });
+    } catch (e) {
+      hasFailure = true;
+      console.error("ORDER AUTO PRINT ERROR:", e);
+      recordPrintFailure({
+        tableId,
+        target,
+        items: targetItems,
+        error: e,
+      });
+    }
+  }
+
+  if (hasFailure) {
+    broadcastSnapshot();
+  }
+}
+
 
 // -------------------------
 // 共通：会計計算
@@ -1737,28 +1768,6 @@ try {
     )
   );
 
-  for (const target of printTargets) {
-    const targetItems = printDeltaItems.filter((item) =>
-      shouldPrintToTarget(item, target) &&
-      item.shouldPrint !== false
-    );
-    try {
-      await printOrderSlip({
-        tableId,
-        target,
-        items: targetItems,
-      });
-    } catch (e) {
-      console.error("ORDER AUTO PRINT ERROR:", e);
-      recordPrintFailure({
-        tableId,
-        target,
-        items: targetItems,
-        error: e,
-      });
-    }
-  }
-
   // ⑦ 全端末に snapshot 配信
   broadcastSnapshot();
 
@@ -1776,6 +1785,10 @@ try {
   }
 
   res.json(responsePayload);
+
+  runOrderAutoPrint({ tableId, printTargets, printDeltaItems }).catch((e) => {
+    console.error("ORDER BACKGROUND PRINT ERROR:", e);
+  });
 
 
 });

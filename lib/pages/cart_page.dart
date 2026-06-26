@@ -41,24 +41,20 @@ class CartPage extends StatelessWidget {
     final table = context.select<AppState, String?>((s) => s.guestTable);
     final realtime = context.watch<RealtimeState>();
     final isSubmitting = orderState.orderSubmitInProgress;
-    final canOrder = table != null &&
+    final realtimeReady = realtime.canSubmitWithRecentSnapshot;
+    final canOrder =
+        table != null &&
         orderState.isActive(table) &&
         orderState.canSubmitOrders &&
-        realtime.connected &&
+        realtimeReady &&
         !isSubmitting;
 
     return Scaffold(
       backgroundColor: bgColor,
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-        title: const Text('カート'),
-      ),
+      appBar: AppBar(backgroundColor: Colors.black, title: const Text('カート')),
       body: cart.items.isEmpty
           ? const Center(
-              child: Text(
-                'カートは空です',
-                style: TextStyle(color: Colors.white70),
-              ),
+              child: Text('カートは空です', style: TextStyle(color: Colors.white70)),
             )
           : Column(
               children: [
@@ -66,7 +62,7 @@ class CartPage extends StatelessWidget {
                   child: ListView.separated(
                     padding: const EdgeInsets.all(16),
                     itemCount: cart.items.length,
-                    separatorBuilder: (_, __) =>
+                    separatorBuilder: (context, index) =>
                         const SizedBox(height: 12),
                     itemBuilder: (context, index) {
                       final item = cart.items[index];
@@ -91,9 +87,7 @@ class CartPage extends StatelessWidget {
                               children: [
                                 Text(
                                   formatYen(item.price),
-                                  style: const TextStyle(
-                                    color: Colors.white70,
-                                  ),
+                                  style: const TextStyle(color: Colors.white70),
                                 ),
                                 const Spacer(),
                                 IconButton(
@@ -128,9 +122,7 @@ class CartPage extends StatelessWidget {
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
                     color: Colors.black,
-                    border: Border(
-                      top: BorderSide(color: Colors.grey),
-                    ),
+                    border: Border(top: BorderSide(color: Colors.grey)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -158,7 +150,9 @@ class CartPage extends StatelessWidget {
                           backgroundColor: accent,
                           foregroundColor: Colors.black,
                         ),
-                        onPressed: canOrder ? () => _confirmOrder(context, cart) : null,
+                        onPressed: canOrder
+                            ? () => _confirmOrder(context, cart)
+                            : null,
                         child: Text(isSubmitting ? '送信中...' : '注文を確定する'),
                       ),
                     ],
@@ -172,10 +166,7 @@ class CartPage extends StatelessWidget {
   // ======================
   // 注文確定処理
   // ======================
- Future<void> _confirmOrder(
-    BuildContext context,
-    CartState cart,
-  ) async {
+  Future<void> _confirmOrder(BuildContext context, CartState cart) async {
     final orderState = context.read<OrderState>();
     final realtime = context.read<RealtimeState>();
     final table = context.read<AppState>().guestTable;
@@ -183,22 +174,22 @@ class CartPage extends StatelessWidget {
     final canSubmit = orderState.canSubmitOrders;
 
     if (orderState.orderSubmitInProgress) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('注文を送信中です。そのままお待ちください。')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('注文を送信中です。そのままお待ちください。')));
       return;
     }
 
-    if (!isActive || !canSubmit || !realtime.connected) {
+    if (!isActive || !canSubmit || !realtime.canSubmitWithRecentSnapshot) {
       final detail = _buildFailureDetail(
         table: table,
         isActive: isActive,
         canSubmitOrders: canSubmit,
-        connected: realtime.connected,
+        connected: realtime.canSubmitWithRecentSnapshot,
       );
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(detail)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(detail)));
       return;
     }
 
@@ -206,7 +197,7 @@ class CartPage extends StatelessWidget {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('注文確認'),
-        content:Text('合計 ${formatYen(cart.total)}\n注文を確定しますか？'),
+        content: Text('合計 ${formatYen(cart.total)}\n注文を確定しますか？'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -222,12 +213,11 @@ class CartPage extends StatelessWidget {
 
     if (ok != true) return;
 
-   
-final sent = await orderState.addFromCart(cart, table);
+    final sent = await orderState.addFromCart(cart, table);
 
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-         SnackBar(
+        SnackBar(
           content: Text(
             sent
                 ? '注文を受け付けました'
@@ -235,7 +225,7 @@ final sent = await orderState.addFromCart(cart, table);
                     table: table,
                     isActive: isActive,
                     canSubmitOrders: canSubmit,
-                    connected: realtime.connected,
+                    connected: realtime.canSubmitWithRecentSnapshot,
                   ),
           ),
         ),

@@ -52,28 +52,24 @@ class CartPage extends StatelessWidget {
     final realtime = context.watch<RealtimeState>();
 
     final isSubmitting = orderState.orderSubmitInProgress;
-    final canOrder = table != null &&
+    final realtimeReady = realtime.canSubmitWithRecentSnapshot;
+    final canOrder =
+        table != null &&
         orderState.isActive(table) &&
         orderState.canSubmitOrders &&
-        realtime.connected &&
+        realtimeReady &&
         !isSubmitting;
 
     return Scaffold(
       backgroundColor: bgColor,
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-        title: const Text('カート'),
-      ),
+      appBar: AppBar(backgroundColor: Colors.black, title: const Text('カート')),
       body: cart.items.isEmpty
           ? const Center(
-              child: Text(
-                'カートは空です',
-                style: TextStyle(color: Colors.white70),
-              ),
+              child: Text('カートは空です', style: TextStyle(color: Colors.white70)),
             )
           : Column(
               children: [
-                if (!realtime.connected || !orderState.canSubmitOrders)
+                if (!realtimeReady || !orderState.canSubmitOrders)
                   Container(
                     width: double.infinity,
                     margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
@@ -104,7 +100,8 @@ class CartPage extends StatelessWidget {
                   child: ListView.separated(
                     padding: const EdgeInsets.all(16),
                     itemCount: cart.items.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(height: 12),
                     itemBuilder: (context, index) {
                       final item = cart.items[index];
                       return Container(
@@ -134,7 +131,8 @@ class CartPage extends StatelessWidget {
                                 IconButton(
                                   icon: const Icon(Icons.remove),
                                   onPressed: canOrder
-                                      ? () => context.read<CartState>().dec(item)
+                                      ? () =>
+                                            context.read<CartState>().dec(item)
                                       : null,
                                 ),
                                 Text(
@@ -147,7 +145,8 @@ class CartPage extends StatelessWidget {
                                 IconButton(
                                   icon: const Icon(Icons.add),
                                   onPressed: canOrder
-                                      ? () => context.read<CartState>().inc(item)
+                                      ? () =>
+                                            context.read<CartState>().inc(item)
                                       : null,
                                 ),
                               ],
@@ -171,7 +170,10 @@ class CartPage extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          const Text('合計', style: TextStyle(color: Colors.white)),
+                          const Text(
+                            '合計',
+                            style: TextStyle(color: Colors.white),
+                          ),
                           const Spacer(),
                           Text(
                             formatYen(cart.total),
@@ -186,7 +188,10 @@ class CartPage extends StatelessWidget {
                       const SizedBox(height: 8),
                       Text(
                         '接続: ${realtime.connected ? 'オンライン' : '再接続中'}  /  最終同期: ${_formatSyncTime(orderState.lastSyncedAt)}',
-                        style: TextStyle(color: Colors.grey.shade400, fontSize: 12),
+                        style: TextStyle(
+                          color: Colors.grey.shade400,
+                          fontSize: 12,
+                        ),
                       ),
                       const SizedBox(height: 16),
                       ElevatedButton(
@@ -194,15 +199,17 @@ class CartPage extends StatelessWidget {
                           backgroundColor: canOrder ? accent : Colors.grey,
                           foregroundColor: Colors.black,
                         ),
-                        onPressed: canOrder ? () => _confirmOrder(context, cart) : null,
+                        onPressed: canOrder
+                            ? () => _confirmOrder(context, cart)
+                            : null,
                         child: Text(
                           isSubmitting
                               ? '送信中...'
                               : canOrder
-                                  ? '注文を確定する'
-                                  : table != null && !orderState.isActive(table)
-                                  ? '受付終了'
-                                  : '同期中',
+                              ? '注文を確定する'
+                              : table != null && !orderState.isActive(table)
+                              ? '受付終了'
+                              : '同期中',
                         ),
                       ),
                     ],
@@ -216,15 +223,16 @@ class CartPage extends StatelessWidget {
   Future<void> _confirmOrder(BuildContext context, CartState cart) async {
     final orderState = context.read<OrderState>();
     final table = context.read<AppState>().guestTable;
-    final connected = context.read<RealtimeState>().connected;
+    final realtime = context.read<RealtimeState>();
+    final connected = realtime.canSubmitWithRecentSnapshot;
 
     final isActive = table != null && orderState.isActive(table);
     final canSubmit = orderState.canSubmitOrders;
 
     if (orderState.orderSubmitInProgress) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('注文を送信中です。そのままお待ちください。')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('注文を送信中です。そのままお待ちください。')));
       return;
     }
 
@@ -235,7 +243,9 @@ class CartPage extends StatelessWidget {
         canSubmitOrders: canSubmit,
         connected: connected,
       );
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(detail)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(detail)));
       return;
     }
 

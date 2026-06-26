@@ -52,6 +52,7 @@ class RealtimeState extends ChangeNotifier with WidgetsBindingObserver {
   Timer? _reconnectTimer;
   Timer? _snapshotTimeoutTimer;
   int _connectionGeneration = 0;
+  int _reconnectAttempt = 0;
 
   RealtimeState(this.orderState) {
     WidgetsBinding.instance.addObserver(this);
@@ -64,6 +65,8 @@ class RealtimeState extends ChangeNotifier with WidgetsBindingObserver {
   DateTime? get lastSnapshotAt => _lastSnapshotAt;
   bool get connected => _connected;
   bool get connecting => _connecting;
+  bool get canSubmitWithRecentSnapshot =>
+      _connected || orderState.hasFreshSnapshot;
 
   Map<String, dynamic> tables = {};
   Map<String, dynamic> ordersByTable = {};
@@ -76,6 +79,7 @@ class RealtimeState extends ChangeNotifier with WidgetsBindingObserver {
     _reconnectTimer?.cancel();
     _connected = true;
     _connecting = false;
+    _reconnectAttempt = 0;
     _snapshot = payload;
     _lastSnapshotAt = DateTime.now();
 
@@ -119,7 +123,7 @@ class RealtimeState extends ChangeNotifier with WidgetsBindingObserver {
       },
       onConnected: () {
         if (generation != _connectionGeneration) return;
-        _snapshotTimeoutTimer = Timer(const Duration(seconds: 8), () {
+        _snapshotTimeoutTimer = Timer(const Duration(seconds: 4), () {
           if (generation != _connectionGeneration || _connected) return;
           _connectionGeneration++;
           _connecting = false;
@@ -144,7 +148,15 @@ class RealtimeState extends ChangeNotifier with WidgetsBindingObserver {
 
   void _scheduleReconnect() {
     _reconnectTimer?.cancel();
-    _reconnectTimer = Timer(const Duration(seconds: 2), () => connect());
+    final delays = [
+      const Duration(milliseconds: 500),
+      const Duration(seconds: 1),
+      const Duration(seconds: 2),
+      const Duration(seconds: 3),
+    ];
+    final delay = delays[_reconnectAttempt.clamp(0, delays.length - 1)];
+    _reconnectAttempt++;
+    _reconnectTimer = Timer(delay, () => connect());
   }
 
   void reconnectNow() {
