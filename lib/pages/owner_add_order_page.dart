@@ -12,9 +12,8 @@ import '../../billing/billing_calculator.dart';
 import '../utils/price_format.dart';
 import '../utils/order_sort.dart'; // 追加
 import 'owner_confirm_add_dialog.dart';
-import 'dart:convert';                    // ← jsonEncode
+import 'dart:convert'; // ← jsonEncode
 import 'package:http/http.dart' as http; // ← http.patch
-
 
 enum OwnerAddCategory {
   menu, // 通常メニュー
@@ -24,10 +23,8 @@ enum OwnerAddCategory {
   free, // ← ★ これを追加
 }
 
-
 class OwnerAddOrderPage extends StatefulWidget {
   final String table;
-
 
   const OwnerAddOrderPage({super.key, required this.table});
   @override
@@ -54,7 +51,6 @@ class _OwnerAddOrderPageState extends State<OwnerAddOrderPage> {
   // =========================
   Map<String, dynamic>? _selectedSet;
 
-
   // =========================
   // その他（カテゴリ→商品）
   // =========================
@@ -63,9 +59,7 @@ class _OwnerAddOrderPageState extends State<OwnerAddOrderPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('注文追加（${widget.table}）'),
-      ),
+      appBar: AppBar(title: Text('注文追加（${widget.table}）')),
       body: Row(
         children: [
           // =====================
@@ -80,7 +74,6 @@ class _OwnerAddOrderPageState extends State<OwnerAddOrderPage> {
                 _catTile('セット', OwnerAddCategory.set),
                 _catTile('その他', OwnerAddCategory.other),
                 _catTile('自由入力', OwnerAddCategory.free),
-
               ],
             ),
           ),
@@ -103,10 +96,7 @@ class _OwnerAddOrderPageState extends State<OwnerAddOrderPage> {
           // =====================
           // 右：伝票
           // =====================
-          Expanded(
-            flex: 2,
-            child: _OrderSlipPanel(table: widget.table),
-          ),
+          Expanded(flex: 2, child: _OrderSlipPanel(table: widget.table)),
         ],
       ),
     );
@@ -136,7 +126,6 @@ class _OwnerAddOrderPageState extends State<OwnerAddOrderPage> {
 
         _selectedSet = null;
 
-
         _selectedOtherCategory = null;
       }),
     );
@@ -157,7 +146,6 @@ class _OwnerAddOrderPageState extends State<OwnerAddOrderPage> {
         return _otherItems(context);
       case OwnerAddCategory.free:
         return _freeInputItems(context);
-
     }
   }
 
@@ -196,7 +184,10 @@ class _OwnerAddOrderPageState extends State<OwnerAddOrderPage> {
             child: ListTile(
               title: Text(
                 cat,
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               trailing: const Icon(Icons.chevron_right),
               onTap: () {
@@ -309,36 +300,35 @@ class _OwnerAddOrderPageState extends State<OwnerAddOrderPage> {
                         title: Text(label),
                         subtitle: Text(formatYen(price)),
 
-       /////////////////////////////////////////////////////
-                       onTap: () async {
-  final result =
-      await showDialog<Map<String, dynamic>>(
-    context: context,
-    builder: (_) => OwnerConfirmAddDialog(
-      label: label,
-      price: price,
-    ),
-  );
+                        /////////////////////////////////////////////////////
+                        onTap: () async {
+                          final result = await showDialog<Map<String, dynamic>>(
+                            context: context,
+                            builder: (_) => OwnerConfirmAddDialog(
+                              label: label,
+                              price: price,
+                            ),
+                          );
 
-  if (result == null) return;
-  if (!context.mounted) return;
-  final qty = result['qty'] as int;
-  final shouldPrint = result['shouldPrint'] as bool;
+                          if (result == null) return;
+                          if (!context.mounted) return;
+                          final qty = result['qty'] as int;
+                          final shouldPrint = result['shouldPrint'] as bool;
 
- await _add(
-    category: (_selectedMenuCategory ?? 'メニュー'),
-    brand: brandName,
-    label: label,
-    price: price,
-    qty: qty,
-    printGroup: (vm['printGroup'] ?? 'kitchen').toString(),
-    // shouldPrint は次で OrderLine に入れる
-    shouldPrint: shouldPrint, // ★ 追加
-  );
-}
+                          await _add(
+                            category: (_selectedMenuCategory ?? 'メニュー'),
+                            brand: brandName,
+                            label: label,
+                            price: price,
+                            qty: qty,
+                            printGroup: (vm['printGroup'] ?? 'kitchen')
+                                .toString(),
+                            // shouldPrint は次で OrderLine に入れる
+                            shouldPrint: shouldPrint, // ★ 追加
+                          );
+                        },
 
-
-                      ///////////////////////
+                        ///////////////////////
                       ),
                     );
                   }).toList(),
@@ -366,7 +356,7 @@ class _OwnerAddOrderPageState extends State<OwnerAddOrderPage> {
         crossAxisSpacing: 12,
         children: castData.items.map((item) {
           final price = item.price;
-// ←今は固定
+          // ←今は固定
 
           return Card(
             child: ListTile(
@@ -376,52 +366,47 @@ class _OwnerAddOrderPageState extends State<OwnerAddOrderPage> {
               ),
               subtitle: Text(formatYen(price)),
 
-                onTap: () async {
-  // ① キャストドリンク選択画面を開く
-  final result = await Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => CastDrinkFlowPage(
-        price: item.price,
-        presetDrinkName: item.name,
-        skipDrinkSelect: true,
-      ),
-    ),
-  );
+              onTap: () async {
+                // ① キャストドリンク選択画面を開く
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => CastDrinkFlowPage(
+                      price: item.price,
+                      presetDrinkName: item.name,
+                      skipDrinkSelect: true,
+                    ),
+                  ),
+                );
 
-  // キャンセルされたら何もしない
-  if (result == null) return;
+                // キャンセルされたら何もしない
+                if (result == null) return;
 
-  // ② 数量・印刷確認ダイアログを出す
-  final dialogResult =
-      await showDialog<Map<String, dynamic>>(
-    context: context,
-    builder: (_) => OwnerConfirmAddDialog(
-      label: '${result.castName}（${result.strength}）',
-      price: result.price,
-    ),
-  );
+                // ② 数量・印刷確認ダイアログを出す
+                final dialogResult = await showDialog<Map<String, dynamic>>(
+                  context: context,
+                  builder: (_) => OwnerConfirmAddDialog(
+                    label: '${result.castName}（${result.strength}）',
+                    price: result.price,
+                  ),
+                );
 
-  // キャンセルされたら何もしない
-  if (dialogResult == null) return;
+                // キャンセルされたら何もしない
+                if (dialogResult == null) return;
 
-  final qty = dialogResult['qty'] as int;
-  final shouldPrint = dialogResult['shouldPrint'] as bool;
+                final qty = dialogResult['qty'] as int;
+                final shouldPrint = dialogResult['shouldPrint'] as bool;
 
-  // ③ ここで初めて注文を確定する
-    await _add(
-
-    category: 'キャストドリンク',
-    brand: result.castName,
-    label: '${result.drinkName}（${result.strength}）',
-    price: result.price,
-    qty: qty,
-    shouldPrint: shouldPrint,
-  );
-                }
-
-
-
+                // ③ ここで初めて注文を確定する
+                await _add(
+                  category: 'キャストドリンク',
+                  brand: result.castName,
+                  label: '${result.drinkName}（${result.strength}）',
+                  price: result.price,
+                  qty: qty,
+                  shouldPrint: shouldPrint,
+                );
+              },
             ),
           );
         }).toList(),
@@ -460,11 +445,9 @@ class _OwnerAddOrderPageState extends State<OwnerAddOrderPage> {
               return Card(
                 child: ListTile(
                   title: Text(strength),
-                  subtitle: Text(formatYen(price))
-,
+                  subtitle: Text(formatYen(price)),
                   onTap: () async {
-                   await _add(
-
+                    await _add(
                       category: 'キャストドリンク',
                       brand: drink.name,
                       label: strength,
@@ -480,155 +463,148 @@ class _OwnerAddOrderPageState extends State<OwnerAddOrderPage> {
     );
   }
 
+  // ============================================================
+  // セット（独立セット → 時間と料金）
+  // ・通常 / 案内所 / VIP は完全に別セット
+  // ・section（normal / agency / extension）は使わない
+  // ・選んだセット内の items をすべてまとめて表示
+  // ・行タップ＝即 注文追加
+  // ============================================================
+  Widget _setItems(BuildContext context) {
+    final setData = context.watch<SetData>();
 
-// ============================================================
-// セット（独立セット → 時間と料金）
-// ・通常 / 案内所 / VIP は完全に別セット
-// ・section（normal / agency / extension）は使わない
-// ・選んだセット内の items をすべてまとめて表示
-// ・行タップ＝即 注文追加
-// ============================================================
- Widget _setItems(BuildContext context) {
-  final setData = context.watch<SetData>();
+    // -------------------------
+    // ① セット未選択：セット一覧
+    // -------------------------
+    if (_selectedSet == null) {
+      final sets = setData.sets;
 
+      if (sets.isEmpty) {
+        return const Center(child: Text('セットがありません'));
+      }
 
+      return GridView.count(
+        crossAxisCount: 3,
+        mainAxisSpacing: 12,
+        crossAxisSpacing: 12,
+        children: sets.map((set) {
+          final name = (set['name'] ?? '').toString();
 
-
-  // -------------------------
-  // ① セット未選択：セット一覧
-  // -------------------------
-  if (_selectedSet == null) {
- final sets = setData.sets;
-
-
-    if (sets.isEmpty) {
-      return const Center(child: Text('セットがありません'));
+          return Card(
+            child: ListTile(
+              title: Text(
+                name,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              subtitle: const Text('タップして選択'),
+              onTap: () {
+                setState(() {
+                  _selectedSet = set;
+                });
+              },
+            ),
+          );
+        }).toList(),
+      );
     }
 
-    return GridView.count(
-      crossAxisCount: 3,
-      mainAxisSpacing: 12,
-      crossAxisSpacing: 12,
-      children: sets.map((set) {
-        final name = (set['name'] ?? '').toString();
+    // -------------------------
+    // ② セット選択後：時間・料金一覧
+    // （sections を全部まとめて表示）
+    // -------------------------
+    final setName = (_selectedSet!['name'] ?? '').toString();
+    final sections = _selectedSet!['sections'] as Map<String, dynamic>;
 
-        return Card(
-          child: ListTile(
-            title: Text(
-              name,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            subtitle: const Text('タップして選択'),
-            onTap: () {
-              setState(() {
-                _selectedSet = set;
-              });
-            },
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  // -------------------------
-  // ② セット選択後：時間・料金一覧
-  // （sections を全部まとめて表示）
-  // -------------------------
-  final setName = (_selectedSet!['name'] ?? '').toString();
-  final sections = _selectedSet!['sections'] as Map<String, dynamic>;
-
-  // section を跨いで全部集める
-  final List<Map<String, dynamic>> items = [];
-  for (final v in sections.values) {
-    if (v is List) {
-      for (final item in v) {
-        if (item is Map<String, dynamic>) {
-          items.add(item);
+    // section を跨いで全部集める
+    final List<Map<String, dynamic>> items = [];
+    for (final v in sections.values) {
+      if (v is List) {
+        for (final item in v) {
+          if (item is Map<String, dynamic>) {
+            items.add(item);
+          }
         }
       }
     }
-  }
 
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      TextButton.icon(
-        onPressed: () {
-          setState(() {
-            _selectedSet = null;
-          });
-        },
-        icon: const Icon(Icons.arrow_back),
-        label: const Text('セット一覧に戻る'),
-      ),
-      Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Text(
-          setName,
-          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextButton.icon(
+          onPressed: () {
+            setState(() {
+              _selectedSet = null;
+            });
+          },
+          icon: const Icon(Icons.arrow_back),
+          label: const Text('セット一覧に戻る'),
         ),
-      ),
-      Expanded(
-        child: items.isEmpty
-            ? const Center(child: Text('項目がありません'))
-            : GridView.count(
-                crossAxisCount: 3,
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 12,
-                children: items.map((item) {
-                  final label = (item['label'] ?? '').toString();
-                  final price = (item['price'] ?? 0) as int;
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Text(
+            setName,
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+        ),
+        Expanded(
+          child: items.isEmpty
+              ? const Center(child: Text('項目がありません'))
+              : GridView.count(
+                  crossAxisCount: 3,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  children: items.map((item) {
+                    final label = (item['label'] ?? '').toString();
+                    final price = (item['price'] ?? 0) as int;
 
-                  return Card(
-                    child: ListTile(
-                      title: Text(label),
-                      subtitle: Text(formatYen(price))
-,
-                     onTap: () async {
-  // ★ 表示文言ではなく「固定キー」を決める
-  String sub = '';
-  if (label.contains('延長')) sub = '延長';
-  if (label.contains('本指名')) sub = '本指名';
-  if (label.contains('場内指名')) sub = '場内指名';
-  if (label.contains('同伴')) sub = '同伴';
+                    return Card(
+                      child: ListTile(
+                        title: Text(label),
+                        subtitle: Text(formatYen(price)),
+                        onTap: () async {
+                          // ★ 表示文言ではなく「固定キー」を決める
+                          String sub = '';
+                          if (label.contains('延長')) sub = '延長';
+                          if (label.contains('本指名')) sub = '本指名';
+                          if (label.contains('場内指名')) sub = '場内指名';
+                          if (label.contains('同伴')) sub = '同伴';
 
-  // ★ 他のカテゴリと同様に確認ダイアログを出す
-  final result = await showDialog<Map<String, dynamic>>(
-    context: context,
-    builder: (_) => OwnerConfirmAddDialog(
-      label: label,
-      price: price,
-    ),
-  );
-  if (result == null) return;
-  if (!context.mounted) return;
+                          // ★ 他のカテゴリと同様に確認ダイアログを出す
+                          final result = await showDialog<Map<String, dynamic>>(
+                            context: context,
+                            builder: (_) => OwnerConfirmAddDialog(
+                              label: label,
+                              price: price,
+                            ),
+                          );
+                          if (result == null) return;
+                          if (!context.mounted) return;
 
-  final qty = result['qty'] as int;
-  final shouldPrint = result['shouldPrint'] as bool;
+                          final qty = result['qty'] as int;
+                          final shouldPrint = result['shouldPrint'] as bool;
 
-  await _add(
-    category: 'セット',
-    brand: setName,
-    label: label,
-    price: price,
-    qty: qty,
-    section: setName == '案内所' ? '案内所' : 'フロア',
-    subCategory: sub,
-    shouldPrint: shouldPrint,
-  );
-},
-
-                    ),
-                  );
-                }).toList(),
-              ),
-      ),
-    ],
-  );
-}
-
-
-
+                          await _add(
+                            category: 'セット',
+                            brand: setName,
+                            label: label,
+                            price: price,
+                            qty: qty,
+                            section: setName == '案内所' ? '案内所' : 'フロア',
+                            subCategory: sub,
+                            shouldPrint: shouldPrint,
+                          );
+                        },
+                      ),
+                    );
+                  }).toList(),
+                ),
+        ),
+      ],
+    );
+  }
 
   // ============================================================
   // その他（カテゴリ → 商品）
@@ -648,7 +624,10 @@ class _OwnerAddOrderPageState extends State<OwnerAddOrderPage> {
             child: ListTile(
               title: Text(
                 cat,
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               trailing: const Icon(Icons.chevron_right),
               onTap: () {
@@ -699,19 +678,15 @@ class _OwnerAddOrderPageState extends State<OwnerAddOrderPage> {
                     return Card(
                       child: ListTile(
                         title: Text(name),
-                        subtitle: Text(formatYen(price))
-,
-                                                               onTap: ()async{
-                          
+                        subtitle: Text(formatYen(price)),
+                        onTap: () async {
                           await _add(
-
-
                             category: 'その他',
                             brand: name,
                             label: '',
                             price: price,
                             subCategory: name, // ★ これを足すだけ
-                           shouldPrint: false,
+                            shouldPrint: false,
                             printGroup: 'none',
                           );
                         },
@@ -727,30 +702,29 @@ class _OwnerAddOrderPageState extends State<OwnerAddOrderPage> {
   // =========================
   // 注文追加
   // =========================
- Future<void> _add(
- {
+  Future<void> _add({
     required String category,
     required String brand,
     required String label,
     required int price,
-   int qty = 1,
+    int qty = 1,
     String printGroup = 'kitchen',
     String? section,
     String subCategory = '', // ← 追加
     bool shouldPrint = true, // ★ 追加
-  })  async{
+  }) async {
     final ok = await context.read<OrderState>().addManual(
-  table: widget.table,
-  category: category,
-  brand: brand,
-  label: label,
-  price: price,
-  qty: qty,
-  printGroup: printGroup,
- section: section ?? (category == 'セット' ? 'フロア' : ''),
-  subCategory: subCategory, // ← 追加
-  shouldPrint: shouldPrint, // ★ 追加
-);
+      table: widget.table,
+      category: category,
+      brand: brand,
+      label: label,
+      price: price,
+      qty: qty,
+      printGroup: printGroup,
+      section: section ?? (category == 'セット' ? 'フロア' : ''),
+      subCategory: subCategory, // ← 追加
+      shouldPrint: shouldPrint, // ★ 追加
+    );
 
     if (!ok && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -758,72 +732,64 @@ class _OwnerAddOrderPageState extends State<OwnerAddOrderPage> {
           content: Text(context.read<OrderState>().buildSubmitErrorMessageJa()),
         ),
       );
+    } else if (ok && mounted) {
+      await context.read<OrderState>().fetchRealtimeTableDetail(widget.table);
     }
-
   }
 
-Widget _freeInputItems(BuildContext context) {
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      const Text(
-        '自由入力（etc）',
-        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-      ),
-      const SizedBox(height: 16),
-
-      TextField(
-        controller: _freeNameCtrl,
-        decoration: const InputDecoration(
-          labelText: '商品名',
-          border: OutlineInputBorder(),
+  Widget _freeInputItems(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          '自由入力（etc）',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
         ),
-      ),
-      const SizedBox(height: 12),
+        const SizedBox(height: 16),
 
-      TextField(
-        controller: _freePriceCtrl,
-        keyboardType: TextInputType.number,
-        decoration: const InputDecoration(
-          labelText: '金額',
-          border: OutlineInputBorder(),
+        TextField(
+          controller: _freeNameCtrl,
+          decoration: const InputDecoration(
+            labelText: '商品名',
+            border: OutlineInputBorder(),
+          ),
         ),
-      ),
-      const SizedBox(height: 16),
-           ElevatedButton(
-  onPressed: () async {
-    final name = _freeNameCtrl.text.trim();
-    final price = int.tryParse(_freePriceCtrl.text) ?? 0;
+        const SizedBox(height: 12),
 
-    if (name.isEmpty || price <= 0) return;
+        TextField(
+          controller: _freePriceCtrl,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            labelText: '金額',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 16),
+        ElevatedButton(
+          onPressed: () async {
+            final name = _freeNameCtrl.text.trim();
+            final price = int.tryParse(_freePriceCtrl.text) ?? 0;
 
-     await _add(
+            if (name.isEmpty || price <= 0) return;
 
-      category: 'その他',
-      brand: name,
-      label: '',
-      price: price,
-      subCategory: 'etc',
-      shouldPrint: false,
-      printGroup: 'none',
+            await _add(
+              category: 'その他',
+              brand: name,
+              label: '',
+              price: price,
+              subCategory: 'etc',
+              shouldPrint: false,
+              printGroup: 'none',
+            );
+
+            _freeNameCtrl.clear();
+            _freePriceCtrl.clear();
+          },
+          child: const Text('伝票に追加'),
+        ),
+      ],
     );
-
-    _freeNameCtrl.clear();
-    _freePriceCtrl.clear();
-  },
-  child: const Text('伝票に追加'),
-),
-
-    ],
-  );
-}
-
-
-
-
-
-
-
+  }
 }
 
 // ===================================================
@@ -839,15 +805,56 @@ class _OrderSlipPanel extends StatefulWidget {
 
 class _OrderSlipPanelState extends State<_OrderSlipPanel> {
   bool _busy = false;
+  bool _loadingDetail = false;
+  String? _detailLoadedFor;
+  String? _lastDetailSummaryKey;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadTableDetail());
+  }
+
+  @override
+  void didUpdateWidget(covariant _OrderSlipPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.table != widget.table) {
+      _detailLoadedFor = null;
+      _lastDetailSummaryKey = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _loadTableDetail());
+    }
+  }
+
+  String _summaryKey(OrderState orderState) {
+    return '${orderState.summaryItemCountOf(widget.table)}:${orderState.summaryTotalOf(widget.table)}';
+  }
+
+  Future<void> _loadTableDetail({bool force = false}) async {
+    if (!mounted || _loadingDetail) return;
+    if (!force && _detailLoadedFor == widget.table) return;
+
+    final summaryKey = _summaryKey(context.read<OrderState>());
+    setState(() => _loadingDetail = true);
+    final loaded = await context.read<OrderState>().fetchRealtimeTableDetail(
+      widget.table,
+    );
+    if (!mounted) return;
+
+    setState(() {
+      _loadingDetail = false;
+      if (loaded) {
+        _detailLoadedFor = widget.table;
+        _lastDetailSummaryKey = summaryKey;
+      }
+    });
+  }
 
   void _showSyncFailedMessage() {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('変更を反映できませんでした。通信状態を確認して再試行してください。'),
-      ),
+      const SnackBar(content: Text('変更を反映できませんでした。通信状態を確認して再試行してください。')),
     );
- }
+  }
 
   bool _isSameAggregatedProduct(OrderLine a, OrderLine b) {
     final aLabel = a.label.trim();
@@ -881,11 +888,7 @@ class _OrderSlipPanelState extends State<_OrderSlipPanel> {
 
     if (delta > 0) {
       final target = matches.first;
-      return _rtUpdateQty(
-        table: table,
-        line: target,
-        qty: target.qty + delta,
-      );
+      return _rtUpdateQty(table: table, line: target, qty: target.qty + delta);
     }
 
     var remaining = -delta;
@@ -929,107 +932,116 @@ class _OrderSlipPanelState extends State<_OrderSlipPanel> {
     return true;
   }
 
-
   Future<bool> _rtUpdateQty({
-  required String table,
-  required OrderLine line,
-  required int qty,
-}) async {
-  if (line.lineId == null) return false; // ★ 追加
-  if (qty <= 0) {
-    return _rtRemoveLine(table: table, line: line);
-  }
+    required String table,
+    required OrderLine line,
+    required int qty,
+  }) async {
+    if (line.lineId == null) return false; // ★ 追加
+    if (qty <= 0) {
+      return _rtRemoveLine(table: table, line: line);
+    }
 
-  try {
-    final uri = ServerConfig.api('/api/rt/tables/$table/items/${line.lineId}');
+    try {
+      final uri = ServerConfig.api(
+        '/api/rt/tables/$table/items/${line.lineId}',
+      );
 
-    final res = await http.patch(
-      uri,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'qty': qty}),
-    );
+      final res = await http.patch(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'qty': qty}),
+      );
 
-   if (res.statusCode != 200) {
-      debugPrint('RT PATCH FAILED ${res.statusCode}');
+      if (res.statusCode != 200) {
+        debugPrint('RT PATCH FAILED ${res.statusCode}');
+        return false;
+      }
+      return true;
+    } catch (e) {
+      debugPrint('RT PATCH ERROR: $e');
       return false;
     }
-    return true;
-  } catch (e) {
-    debugPrint('RT PATCH ERROR: $e');
-    return false;
   }
-}
 
-Future<bool> _rtRemoveLine({
-  required String table,
-  required OrderLine line,
-}) async {
-  if (line.lineId == null) return false;
+  Future<bool> _rtRemoveLine({
+    required String table,
+    required OrderLine line,
+  }) async {
+    if (line.lineId == null) return false;
 
-  try {
-    final uri = ServerConfig.api('/api/rt/tables/$table/items/${line.lineId}');
+    try {
+      final uri = ServerConfig.api(
+        '/api/rt/tables/$table/items/${line.lineId}',
+      );
 
-    final res = await http.delete(uri);
+      final res = await http.delete(uri);
 
-     if (res.statusCode != 200) {
-      debugPrint('RT DELETE FAILED ${res.statusCode}');
+      if (res.statusCode != 200) {
+        debugPrint('RT DELETE FAILED ${res.statusCode}');
+        return false;
+      }
+      return true;
+    } catch (e) {
+      debugPrint('RT DELETE ERROR: $e');
       return false;
     }
-    return true;
-  } catch (e) {
-    debugPrint('RT DELETE ERROR: $e');
-    return false;
-  }
-}
-
- int _orderPriority(OrderLine l) {
-  // ★ その他の場合は subCategory で判定
-  if (l.category == 'その他') {
-    if (l.subCategory == '本指名') return 3;
-    if (l.subCategory == '場内指名') return 4;
-    if (l.subCategory == '同伴') return 5;
   }
 
-  if (l.category == 'セット') return 1;
-  if (l.category.contains('延長')) return 2;
+  int _orderPriority(OrderLine l) {
+    // ★ その他の場合は subCategory で判定
+    if (l.category == 'その他') {
+      if (l.subCategory == '本指名') return 3;
+      if (l.subCategory == '場内指名') return 4;
+      if (l.subCategory == '同伴') return 5;
+    }
 
-  if (l.category == 'キャストドリンク') return 6;
-  if (l.category == 'メニュー') return 7;
+    if (l.category == 'セット') return 1;
+    if (l.category.contains('延長')) return 2;
 
-  return 99;
-}
+    if (l.category == 'キャストドリンク') return 6;
+    if (l.category == 'メニュー') return 7;
 
-
+    return 99;
+  }
 
   @override
   Widget build(BuildContext context) {
     final orderState = context.watch<OrderState>();
 
-final order = orderState.realtimeOrderForDisplay(widget.table);
+    final order = orderState.realtimeOrderForDisplay(widget.table);
     final billingTotal = order == null
         ? 0
         : BillingCalculator.calculateFromLines(order.lines).total;
+    final currentSummaryKey = _summaryKey(orderState);
+    if (_detailLoadedFor == widget.table &&
+        _lastDetailSummaryKey != null &&
+        _lastDetailSummaryKey != currentSummaryKey &&
+        !_loadingDetail) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _loadTableDetail(force: true),
+      );
+    }
     final rawLines = order == null
         ? <OrderLine>[]
         : sortOrderLines(order.lines);
     final lines = orderState.aggregateLinesForDisplay(rawLines);
 
-lines.sort((a, b) {
-  final pa = _orderPriority(a);
-  final pb = _orderPriority(b);
+    lines.sort((a, b) {
+      final pa = _orderPriority(a);
+      final pb = _orderPriority(b);
 
-  // 優先度が違う
-  if (pa != pb) return pa.compareTo(pb);
+      // 優先度が違う
+      if (pa != pb) return pa.compareTo(pb);
 
-  // キャストドリンク・通常メニューは金額順（高い→安い）
-  if (pa >= 6) {
-    return b.price.compareTo(a.price);
-  }
+      // キャストドリンク・通常メニューは金額順（高い→安い）
+      if (pa >= 6) {
+        return b.price.compareTo(a.price);
+      }
 
-  // それ以外は元の順
-  return 0;
-});
-
+      // それ以外は元の順
+      return 0;
+    });
 
     return AbsorbPointer(
       absorbing: _busy,
@@ -1049,139 +1061,148 @@ lines.sort((a, b) {
                   ? const Center(child: Text('注文なし'))
                   : ListView.separated(
                       itemCount: lines.length,
-                      separatorBuilder: (_, _) =>
-                          const Divider(height: 12),
+                      separatorBuilder: (_, _) => const Divider(height: 12),
                       itemBuilder: (context, i) {
                         final l = lines[i];
-                         final cleanBrand = l.brand.trim() == 'RT'
+                        final cleanBrand = l.brand.trim() == 'RT'
                             ? ''
                             : l.brand.trim();
                         final cleanLabel = l.label.trim() == 'RT'
                             ? ''
                             : l.label.trim();
-                        final title = [cleanBrand, cleanLabel]
-                            .where((e) => e.isNotEmpty)
-                            .join(' ');
+                        final title = [
+                          cleanBrand,
+                          cleanLabel,
+                        ].where((e) => e.isNotEmpty).join(' ');
 
-                       return Row(
-  children: [
-    Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            formatYen(l.price),
-            style: const TextStyle(color: Colors.amber),
-          ),
-        ],
-      ),
-    ),
+                        return Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    title,
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    formatYen(l.price),
+                                    style: const TextStyle(color: Colors.amber),
+                                  ),
+                                ],
+                              ),
+                            ),
 
-    // − ボタン
-   IconButton(
-  icon: const Icon(Icons.remove),
-  onPressed: () async {
-    final isRT = context
-        .read<OrderState>()
-        .isRealtimeOrderId(order!.id);
+                            // − ボタン
+                            IconButton(
+                              icon: const Icon(Icons.remove),
+                              onPressed: () async {
+                                final isRT = context
+                                    .read<OrderState>()
+                                    .isRealtimeOrderId(order!.id);
 
-    final newQty = l.qty - 1;
+                                final newQty = l.qty - 1;
 
-     if (isRT) {
-      // ★ RT 注文 → サーバーに送る（後で中身を書く）
-      final ok = await _rtChangeAggregatedQty(
-        table: widget.table,
-       aggregatedLine: l,
-                rawLines: rawLines,
-                delta: -1,
-      );
-      if (!ok) _showSyncFailedMessage();
-    } else {
-      // ★ 従来どおり
-      if (newQty <= 0) {
-        final ok = await context.read<OrderState>().removeLine(order.id, l);
-        if (!ok) _showSyncFailedMessage();
-        if (!mounted) return;
-      } else {
-        final ok = await context.read<OrderState>().updateQty(order.id, l, newQty);
-        if (!ok) _showSyncFailedMessage();
-        if (!mounted) return;
+                                if (isRT) {
+                                  // ★ RT 注文 → サーバーに送る（後で中身を書く）
+                                  final ok = await _rtChangeAggregatedQty(
+                                    table: widget.table,
+                                    aggregatedLine: l,
+                                    rawLines: rawLines,
+                                    delta: -1,
+                                  );
+                                  if (!ok) _showSyncFailedMessage();
+                                  if (ok) await _loadTableDetail(force: true);
+                                } else {
+                                  // ★ 従来どおり
+                                  if (newQty <= 0) {
+                                    final ok = await context
+                                        .read<OrderState>()
+                                        .removeLine(order.id, l);
+                                    if (!ok) _showSyncFailedMessage();
+                                    if (ok) await _loadTableDetail(force: true);
+                                    if (!mounted) return;
+                                  } else {
+                                    final ok = await context
+                                        .read<OrderState>()
+                                        .updateQty(order.id, l, newQty);
+                                    if (!ok) _showSyncFailedMessage();
+                                    if (ok) await _loadTableDetail(force: true);
+                                    if (!mounted) return;
+                                  }
+                                }
+                              },
+                            ),
 
-      }
-        }
-  },
-),
+                            // 削除ボタン
+                            IconButton(
+                              icon: const Icon(Icons.delete),
+                              onPressed: () async {
+                                final isRT = context
+                                    .read<OrderState>()
+                                    .isRealtimeOrderId(order!.id);
 
-    // 削除ボタン
-    IconButton(
-      icon: const Icon(Icons.delete),
-      onPressed: () async {
-        final isRT = context
-            .read<OrderState>()
-            .isRealtimeOrderId(order!.id);
+                                if (isRT) {
+                                  final ok = await _rtRemoveAggregatedLine(
+                                    table: widget.table,
+                                    aggregatedLine: l,
+                                    rawLines: rawLines,
+                                  );
+                                  if (!ok) _showSyncFailedMessage();
+                                  if (ok) await _loadTableDetail(force: true);
+                                } else {
+                                  final ok = await context
+                                      .read<OrderState>()
+                                      .removeLine(order.id, l);
+                                  if (!ok) _showSyncFailedMessage();
+                                  if (ok) await _loadTableDetail(force: true);
+                                  if (!mounted) return;
+                                }
+                              },
+                            ),
 
-        if (isRT) {
-           final ok = await _rtRemoveAggregatedLine(
-            table: widget.table,
-           aggregatedLine: l,
-            rawLines: rawLines,
-          );
-          if (!ok) _showSyncFailedMessage();
-        } else {
-          final ok = await context.read<OrderState>().removeLine(order.id, l);
-          if (!ok) _showSyncFailedMessage();
-          if (!mounted) return;
-        }
-      },
-    ),
+                            // 数量表示
+                            Text(
+                              '${l.qty}',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
 
+                            // ＋ ボタン
+                            IconButton(
+                              icon: const Icon(Icons.add),
+                              onPressed: () async {
+                                final isRT = context
+                                    .read<OrderState>()
+                                    .isRealtimeOrderId(order!.id);
 
-    // 数量表示
-    Text(
-      '${l.qty}',
-      style: const TextStyle(
-        fontSize: 16,
-        fontWeight: FontWeight.bold,
-      ),
-    ),
-
-    // ＋ ボタン
-   IconButton(
-  icon: const Icon(Icons.add),
-  onPressed: () async {
-    final isRT = context
-        .read<OrderState>()
-        .isRealtimeOrderId(order!.id);
-
-    if (isRT) {
-     final ok = await _rtChangeAggregatedQty(
-        table: widget.table,
-                       aggregatedLine: l,
-                rawLines: rawLines,
-                delta: 1,
-      );
-      if (!ok) _showSyncFailedMessage();
-    } else {
-      final ok = await context
-          .read<OrderState>()
-          .updateQty(order.id, l, l.qty + 1);
-      if (!ok) _showSyncFailedMessage();
-      if (!mounted) return;
-    }
-  },
-),
-
-  ],
-);
-
+                                if (isRT) {
+                                  final ok = await _rtChangeAggregatedQty(
+                                    table: widget.table,
+                                    aggregatedLine: l,
+                                    rawLines: rawLines,
+                                    delta: 1,
+                                  );
+                                  if (!ok) _showSyncFailedMessage();
+                                  if (ok) await _loadTableDetail(force: true);
+                                } else {
+                                  final ok = await context
+                                      .read<OrderState>()
+                                      .updateQty(order.id, l, l.qty + 1);
+                                  if (!ok) _showSyncFailedMessage();
+                                  if (ok) await _loadTableDetail(force: true);
+                                  if (!mounted) return;
+                                }
+                              },
+                            ),
+                          ],
+                        );
                       },
                     ),
             ),
