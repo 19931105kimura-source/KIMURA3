@@ -29,13 +29,14 @@ class _GuestCategoryPageState extends State<GuestCategoryPage> {
   Widget build(BuildContext context) {
     // ← あなたの今の巨大な build
     final promoState = context.watch<PromoState>();
-     final menuData = context.watch<MenuData>();
+    final menuData = context.watch<MenuData>();
     final cart = context.watch<CartState>();
     final hasCartItems = cart.items.isNotEmpty;
     final cartHighlightColor = Colors.orange.shade300;
 
-    final normalCategories =
-        menuData.categories.where((c) => c != 'キャストドリンク').toList();
+    final normalCategories = menuData.categories
+        .where((c) => c != 'キャストドリンク')
+        .toList();
 
     final guestCategories = [...normalCategories, 'キャストドリンク'];
 
@@ -62,40 +63,43 @@ class _GuestCategoryPageState extends State<GuestCategoryPage> {
             elevation: 0,
             /////////////
             title: Row(
-  mainAxisSize: MainAxisSize.min,
-  children: [
-    const Text(
-      'MENU',
-      style: TextStyle(
-        fontWeight: FontWeight.w600,
-        letterSpacing: 1.5,
-      ),
-    ),
-    const SizedBox(width: 12),
-    Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        '席 ${context.watch<AppState>().guestTable}',
-        style: const TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w500,
-          letterSpacing: 0.5,
-        ),
-      ),
-    ),
-  ],
-),
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'MENU',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '席 ${context.watch<AppState>().guestTable}',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ],
+            ),
 
-           ///////////////
-           actions: [
+            ///////////////
+            actions: [
               IconButton(
-                 tooltip: 'メニュー更新',
+                tooltip: 'メニュー更新',
                 icon: const Icon(Icons.refresh),
-               onPressed: () async {
+                onPressed: () async {
                   await Future.wait([
                     context.read<MenuData>().load(),
                     context.read<PromoState>().load(),
@@ -108,7 +112,7 @@ class _GuestCategoryPageState extends State<GuestCategoryPage> {
                   );
                 },
               ),
-               IconButton(
+              IconButton(
                 tooltip: 'カート',
                 icon: Icon(
                   Icons.shopping_cart,
@@ -128,9 +132,8 @@ class _GuestCategoryPageState extends State<GuestCategoryPage> {
                   ),
                 ),
               ),
-             ////////////////////////////////////////
+              ////////////////////////////////////////
               IconButton(
-              
                 icon: const Icon(Icons.receipt_long),
                 tooltip: '注文履歴',
                 onPressed: () {
@@ -142,7 +145,7 @@ class _GuestCategoryPageState extends State<GuestCategoryPage> {
                   );
                 },
               ),
-                 ////////////////////////////////////////
+              ////////////////////////////////////////
               IconButton(
                 tooltip: 'ログアウト',
                 icon: const Icon(Icons.logout),
@@ -153,9 +156,8 @@ class _GuestCategoryPageState extends State<GuestCategoryPage> {
                       title: const Text('ログアウト'),
                       content: const Text('ログアウトしますか？'),
                       actions: [
-                       
-                       /////////////////////////////////////
-                      TextButton(
+                        /////////////////////////////////////
+                        TextButton(
                           onPressed: () => Navigator.pop(context, false),
                           child: const Text('キャンセル'),
                         ),
@@ -176,8 +178,7 @@ class _GuestCategoryPageState extends State<GuestCategoryPage> {
                   }
                 },
               ),
-            ],//ボタン
-         
+            ], //ボタン
           ),
           body: LayoutBuilder(
             builder: (context, c) {
@@ -186,8 +187,10 @@ class _GuestCategoryPageState extends State<GuestCategoryPage> {
               final left = ListView(
                 children: guestCategories.map((category) {
                   return Container(
-                    margin:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    margin: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFF1A1A1F),
                       borderRadius: BorderRadius.circular(20),
@@ -208,42 +211,50 @@ class _GuestCategoryPageState extends State<GuestCategoryPage> {
                           letterSpacing: 0.5,
                         ),
                       ),
-                      trailing: const Icon(Icons.chevron_right,
-                          color: Colors.white54),
-                     
-                     onTap: () async {
-  if (category == 'キャストドリンク') {
-    final result = await Navigator.push<CastDrinkResult>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const CastDrinkFlowPage(
-        ),
-      ),
-    );
+                      trailing: const Icon(
+                        Icons.chevron_right,
+                        color: Colors.white54,
+                      ),
 
-    if (result != null && context.mounted) {
-      context.read<CartState>().add(
-        category: 'キャストドリンク',
-        brand: result.castName, // キャスト名
-        label: '${result.drinkName}（${result.strength}）',
-        price: result.price,
-      );
-    }
-    return;
-  }
+                      onTap: () async {
+                        if (category == 'キャストドリンク') {
+                          final result = await Navigator.push<CastDrinkResult>(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const CastDrinkFlowPage(),
+                            ),
+                          );
 
+                          if (result != null && context.mounted) {
+                            context.read<CartState>().add(
+                              category: 'キャストドリンク',
+                              brand: result.castName, // キャスト名
+                              label: '${result.drinkName}（${result.strength}）',
+                              price: result.price,
+                            );
+                          }
+                          return;
+                        }
 
                         Navigator.push(
                           context,
                           PageRouteBuilder(
-                            transitionDuration:
-                                const Duration(milliseconds: 300),
+                            transitionDuration: const Duration(
+                              milliseconds: 300,
+                            ),
                             pageBuilder:
                                 (context, animation, secondaryAnimation) =>
                                     BrandListPage(category: category),
                             transitionsBuilder:
-                                (context, animation, secondaryAnimation, child) =>
-                                    FadeTransition(opacity: animation, child: child),
+                                (
+                                  context,
+                                  animation,
+                                  secondaryAnimation,
+                                  child,
+                                ) => FadeTransition(
+                                  opacity: animation,
+                                  child: child,
+                                ),
                           ),
                         );
                       },
@@ -292,10 +303,7 @@ class _PromoSplitPanel extends StatelessWidget {
   final List<Promo> top;
   final List<Promo> bottom;
 
-  const _PromoSplitPanel({
-    required this.top,
-    required this.bottom,
-  });
+  const _PromoSplitPanel({required this.top, required this.bottom});
 
   @override
   Widget build(BuildContext context) {
@@ -320,6 +328,7 @@ class _PromoPanelState extends State<_PromoPanel> {
   Timer? _autoSlideTimer;
 
   VideoPlayerController? _activeListController;
+  final Set<String> _precachedPromoUrls = {};
 
   String _normalizeKey(String s) {
     return s.trim().replaceAll('　', ' ').replaceAll(RegExp(r'\s+'), ' ');
@@ -353,9 +362,7 @@ class _PromoPanelState extends State<_PromoPanel> {
       if (brand == null || brand.isEmpty) {
         Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (_) => BrandListPage(category: category),
-          ),
+          MaterialPageRoute(builder: (_) => BrandListPage(category: category)),
         );
         return;
       }
@@ -372,7 +379,7 @@ class _PromoPanelState extends State<_PromoPanel> {
         Navigator.push(
           context,
           MaterialPageRoute(
-           builder: (_) => VariantListPage(
+            builder: (_) => VariantListPage(
               category: category,
               brandName: brand,
               variants: variants,
@@ -381,14 +388,12 @@ class _PromoPanelState extends State<_PromoPanel> {
         );
         return;
       }
-      
+
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => BrandListPage(
-            category: category,
-            initialBrand: brand,
-          ),
+          builder: (_) =>
+              BrandListPage(category: category, initialBrand: brand),
         ),
       );
       return;
@@ -397,9 +402,7 @@ class _PromoPanelState extends State<_PromoPanel> {
     if (p.linkType == 'category') {
       Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (_) => BrandListPage(category: category),
-        ),
+        MaterialPageRoute(builder: (_) => BrandListPage(category: category)),
       );
     }
   }
@@ -410,15 +413,16 @@ class _PromoPanelState extends State<_PromoPanel> {
     _activeListController = c;
   }
 
- @override
+  @override
   void initState() {
     super.initState();
     _pc = PageController();
     _startAutoSlide();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _precachePromoImages());
   }
 
   @override
- void dispose() {
+  void dispose() {
     _autoSlideTimer?.cancel();
     _pc.dispose();
     _activeListController?.dispose();
@@ -433,6 +437,23 @@ class _PromoPanelState extends State<_PromoPanel> {
         _index = widget.promos.isEmpty ? 0 : widget.promos.length - 1;
       }
       _startAutoSlide();
+    }
+    final oldUrls = oldWidget.promos.map((e) => e.imageUrl).join('|');
+    final newUrls = widget.promos.map((e) => e.imageUrl).join('|');
+    if (oldUrls != newUrls) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _precachePromoImages(),
+      );
+    }
+  }
+
+  void _precachePromoImages() {
+    if (!mounted) return;
+    for (final promo in widget.promos) {
+      final url = promo.imageUrl;
+      if (url.isEmpty || url.toLowerCase().endsWith('.mp4')) continue;
+      if (!_precachedPromoUrls.add(url)) continue;
+      precacheImage(NetworkImage(url), context).catchError((_) {});
     }
   }
 
@@ -466,7 +487,7 @@ class _PromoPanelState extends State<_PromoPanel> {
           PageView.builder(
             controller: _pc,
             itemCount: widget.promos.length,
-             onPageChanged: (i) {
+            onPageChanged: (i) {
               _setActiveList(null);
               setState(() => _index = i);
               _startAutoSlide();
@@ -542,19 +563,24 @@ class _PromoTile extends StatelessWidget {
         fit: StackFit.expand,
         children: [
           isVideo
-    ? _MutedAutoVideo(
-        url: promo.imageUrl,
-        onControllerReady: onControllerReady,
-      )
-    : Positioned.fill(
-         child: Image.network(
-          promo.imageUrl,
-          fit: BoxFit.cover,
-          alignment: Alignment(promo.focalX, promo.focalY),
-          errorBuilder: (context, error, stackTrace) =>
-              const Center(child: Text('画像を読み込めません')),
-        ),
-      ),
+              ? _MutedAutoVideo(
+                  url: promo.imageUrl,
+                  onControllerReady: onControllerReady,
+                )
+              : Positioned.fill(
+                  child: Image.network(
+                    promo.imageUrl,
+                    fit: BoxFit.cover,
+                    alignment: Alignment(promo.focalX, promo.focalY),
+                    gaplessPlayback: true,
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return const ColoredBox(color: Colors.black);
+                    },
+                    errorBuilder: (context, error, stackTrace) =>
+                        const Center(child: Text('画像を読み込めません')),
+                  ),
+                ),
 
           if (isVideo)
             const Positioned(
@@ -576,10 +602,7 @@ class _MutedAutoVideo extends StatefulWidget {
   final String url;
   final void Function(VideoPlayerController) onControllerReady;
 
-  const _MutedAutoVideo({
-    required this.url,
-    required this.onControllerReady,
-  });
+  const _MutedAutoVideo({required this.url, required this.onControllerReady});
 
   @override
   State<_MutedAutoVideo> createState() => _MutedAutoVideoState();
@@ -669,10 +692,7 @@ class _PromoFullScreenPageState extends State<PromoFullScreenPage> {
               final url = widget.urls[i];
               final isVideo = url.endsWith('.mp4');
               return isVideo
-                  ? _VideoPlayerItem(
-                      url: url,
-                      onControllerReady: _setActive,
-                    )
+                  ? _VideoPlayerItem(url: url, onControllerReady: _setActive)
                   : Image.network(url, fit: BoxFit.cover);
             },
           ),
@@ -694,10 +714,7 @@ class _VideoPlayerItem extends StatefulWidget {
   final String url;
   final void Function(VideoPlayerController) onControllerReady;
 
-  const _VideoPlayerItem({
-    required this.url,
-    required this.onControllerReady,
-  });
+  const _VideoPlayerItem({required this.url, required this.onControllerReady});
 
   @override
   State<_VideoPlayerItem> createState() => _VideoPlayerItemState();

@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 
 import 'cart_state.dart';
 
+import '../billing/billing_calculator.dart';
 import '../data/server_config.dart';
 
 /// =======================
@@ -423,7 +424,8 @@ class OrderState extends ChangeNotifier {
     }
 
     final order = realtimeOrderForDisplay(table) ?? orderOf(table);
-    return order?.total ?? 0;
+    if (order == null) return 0;
+    return BillingCalculator.calculateFromLines(order.lines).total;
   }
 
   bool hasOrderSummary(String table) {
