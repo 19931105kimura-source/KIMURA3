@@ -9,13 +9,15 @@ class WebSocketService {
 
   void connect(
     void Function(Map<String, dynamic>) onSnapshot, {
+    String? mode,
+    String? table,
     void Function()? onConnected,
     void Function()? onDisconnected,
   }) {
     dispose();
 
     _channel = WebSocketChannel.connect(
-      Uri.parse(ServerConfig.wsBaseUrl()),
+      Uri.parse(ServerConfig.wsBaseUrl(mode: mode, table: table)),
     );
 
     onConnected?.call();

@@ -20,14 +20,6 @@ class _LoginPageState extends State<LoginPage> {
   bool _isOwnerLoginVisible = false;
 
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<RealtimeState>().connect();
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Stack(
@@ -46,7 +38,7 @@ class _LoginPageState extends State<LoginPage> {
                   child: Image.asset(
                     'assets/images/login_logo.png',
                     fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => const Center(
+                    errorBuilder: (context, error, stackTrace) => const Center(
                       child: Text(
                         'LOGIN LOGO',
                         style: TextStyle(
@@ -95,9 +87,9 @@ class _LoginPageState extends State<LoginPage> {
       _ownerUnlockTapCount = 0;
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('オーナーログインを表示しました')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('オーナーログインを表示しました')));
   }
 
   Future<void> _guestLogin(BuildContext context) async {
@@ -125,10 +117,11 @@ class _LoginPageState extends State<LoginPage> {
     );
 
     if (table == null || table.isEmpty) return;
-    if (!mounted) return;
+    if (!context.mounted) return;
 
     context.read<AppState>().loginAsGuest(table);
     context.read<CartState>().clear();
+    context.read<RealtimeState>().connectAsGuest(table);
 
     Navigator.pushReplacement(
       context,
@@ -163,16 +156,17 @@ class _LoginPageState extends State<LoginPage> {
     );
 
     if (code == null) return;
-    if (!mounted) return;
+    if (!context.mounted) return;
 
     if (code != ownerPasscode) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('パスコードが違います')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('パスコードが違います')));
       return;
     }
 
     context.read<AppState>().loginAsOwner();
+    context.read<RealtimeState>().connectAsOwner();
 
     Navigator.pushReplacement(
       context,

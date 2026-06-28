@@ -8,9 +8,21 @@ class ServerConfig {
 
   static final Uri baseUri = Uri.parse(baseUrl);
 
-  static String wsBaseUrl() {
+  static String wsBaseUrl({String? mode, String? table}) {
     final wsScheme = baseUri.scheme == 'https' ? 'wss' : 'ws';
-    return baseUri.replace(scheme: wsScheme).toString();
+    final query = <String, String>{};
+    if (mode != null && mode.trim().isNotEmpty) {
+      query['mode'] = mode.trim();
+    }
+    if (table != null && table.trim().isNotEmpty) {
+      query['table'] = table.trim();
+    }
+    return baseUri
+        .replace(
+          scheme: wsScheme,
+          queryParameters: query.isEmpty ? null : query,
+        )
+        .toString();
   }
 
   static Uri api(String path) {

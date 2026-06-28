@@ -28,7 +28,7 @@ class _OwnerTablePageState extends State<OwnerTablePage> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<RealtimeState>().connect();
+      context.read<RealtimeState>().connectAsOwner();
       context.read<OrderState>().refreshTablesFromServer();
     });
   }

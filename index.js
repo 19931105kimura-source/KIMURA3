@@ -416,6 +416,8 @@ function shouldPrintToTarget(item, target) {
 
 const printFailures = [];
 const MAX_PRINT_FAILURES = 50;
+let globalUpdateSeq = 0;
+let lastGlobalUpdateKind = null;
 
 function printTargetLabel(target) {
   const normalizedTarget = normalizePrintTarget(target);
@@ -447,6 +449,11 @@ function recordPrintFailure({ tableId, target, items, error }) {
   }
 
   return entry;
+}
+
+function markGlobalUpdate(kind) {
+  globalUpdateSeq++;
+  lastGlobalUpdateKind = kind;
 }
 
 function readIntEnv(name, fallback) {
@@ -657,7 +664,7 @@ async function runOrderAutoPrint({ tableId, printTargets, printDeltaItems }) {
   }
 
   if (hasFailure) {
-    broadcastSnapshot();
+    broadcastSnapshot({ tableId });
   }
 }
 
@@ -849,6 +856,9 @@ app.post("/api/menu", (req, res) => {
   for (const it of stabilized) {
     store.products.set(it.productId, it);
   }
+
+  markGlobalUpdate("menu");
+  broadcastSnapshot({ global: true });
 
   res.json({ success: true });
 });
@@ -1393,7 +1403,7 @@ app.post("/api/deleted-orders/:id/restore", (req, res) => {
     entry.restoredAt = new Date().toISOString();
     entry.restoredToTable = targetTable;
     saveDeletedOrders(deletedOrders);
-    broadcastSnapshot();
+    broadcastSnapshot({ tableId: targetTable });
     rollbackState = null;
 
     res.json({ ok: true, entry });
@@ -1407,7 +1417,7 @@ app.post("/api/deleted-orders/:id/restore", (req, res) => {
         } else {
           store.tables.delete(rollbackTableId);
         }
-        broadcastSnapshot();
+        broadcastSnapshot({ tableId: rollbackTableId });
       } catch (rollbackError) {
         console.error("DELETED ORDER RESTORE ROLLBACK ERROR:", rollbackError);
       }
@@ -1473,6 +1483,9 @@ app.post("/api/promos", (req, res) => {
       JSON.stringify({ top, bottom }, null, 2),
       "utf8"
     );
+
+    markGlobalUpdate("promos");
+    broadcastSnapshot({ global: true });
 
     res.json({ ok: true });
   } catch (e) {
@@ -1769,7 +1782,7 @@ try {
   );
 
   // ⑦ 全端末に snapshot 配信
-  broadcastSnapshot();
+  broadcastSnapshot({ tableId });
 
   const responsePayload = {
     ok: true,
@@ -1805,7 +1818,7 @@ app.post('/api/orders/sync-table', (req, res) => {
 
   try {
     replaceTableItems(tableId, lines);
-    broadcastSnapshot();
+    broadcastSnapshot({ tableId });
     return res.json({ success: true });
   } catch (e) {
     console.error("SYNC TABLE FAILED:", {
@@ -1824,6 +1837,8 @@ app.post('/api/orders/sync-table', (req, res) => {
 function buildSnapshot() {
   const payload = store.buildRealtimeSnapshot();
   payload.printFailures = printFailures;
+  payload.globalUpdateSeq = globalUpdateSeq;
+  payload.globalUpdateKind = lastGlobalUpdateKind;
   return {
     type: "snapshot",
     payload, // ★ ここが正本
@@ -1834,7 +1849,67 @@ function buildSnapshot() {
   // ★ ここを追加 ★
 
 ///////////////////
-function broadcastSnapshot() {
+function buildTableSnapshot(tableId) {
+  const key = String(tableId ?? "").trim();
+  const table = store.tables?.get(key) ?? {
+    tableId: key,
+    status: "closed",
+    openedAt: null,
+    closedAt: null,
+  };
+  const dbItems = typeof store.getTableItemsFromDb === "function"
+    ? store.getTableItemsFromDb(key)
+    : [];
+  const itemsForSnapshot = dbItems.map((item) => ({
+    lineId: item.lineId ?? item.orderItemId,
+    category: item.category ?? "",
+    brand: item.brand ?? "",
+    name: item.name ?? item.label ?? "",
+    label: item.label ?? item.name ?? "",
+    price: Number(item.price ?? 0),
+    qty: Number(item.qty ?? item.quantity ?? 0),
+    quantity: Number(item.qty ?? item.quantity ?? 0),
+    section: item.section ?? null,
+    subCategory: item.subCategory ?? "",
+    contributors: item.contributors ?? null,
+    shouldPrint: item.shouldPrint !== false,
+    printGroup: item.printGroup ?? "kitchen",
+  }));
+  const rtOrderId = `rt_${key}`;
+
+  return {
+    type: "snapshot",
+    payload: {
+      tables: {
+        [key]: {
+          tableId: key,
+          status: table.status,
+          openedAt: table.openedAt ?? null,
+          order: {
+            tableId: key,
+            openedAt: table.openedAt ?? null,
+            items: itemsForSnapshot,
+          },
+        },
+      },
+      ordersByTable: { [key]: [rtOrderId] },
+      orderItems: { [rtOrderId]: itemsForSnapshot },
+      printFailures: printFailures.filter((item) => item.tableId === key),
+      globalUpdateSeq,
+      globalUpdateKind: lastGlobalUpdateKind,
+      at: new Date().toISOString(),
+    },
+  };
+}
+
+function snapshotForClient(client) {
+  const role = client.clientRole === "owner" ? "owner" : "guest";
+  if (role === "owner") return buildSnapshot();
+  if (client.clientTable) return buildTableSnapshot(client.clientTable);
+  return buildSnapshot();
+}
+
+function legacyBroadcastSnapshot() {
   const data = JSON.stringify(buildSnapshot()); // ★ここだけ
   for (const client of wss.clients) {
     if (client.readyState === WebSocket.OPEN) {
@@ -1846,13 +1921,56 @@ function broadcastSnapshot() {
 // =========================
 // listen（必ず最後）
 // =========================
+function broadcastSnapshot({ tableId = null, global = false } = {}) {
+  let ownerData = null;
+  const tableCache = new Map();
+  for (const client of wss.clients) {
+    if (client.readyState !== WebSocket.OPEN) continue;
+
+    const role = client.clientRole === "owner" ? "owner" : "guest";
+    if (role === "owner") {
+      ownerData ??= JSON.stringify(buildSnapshot());
+      client.send(ownerData);
+      continue;
+    }
+
+    const clientTable = String(client.clientTable ?? "").trim();
+    if (!clientTable) {
+      ownerData ??= JSON.stringify(buildSnapshot());
+      client.send(ownerData);
+      continue;
+    }
+    if (!global && tableId && clientTable !== String(tableId)) continue;
+
+    let data = tableCache.get(clientTable);
+    if (!data) {
+      data = JSON.stringify(buildTableSnapshot(clientTable));
+      tableCache.set(clientTable, data);
+    }
+    client.send(data);
+  }
+}
+
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
-wss.on("connection", (ws) => {
-  console.log("WebSocket connected. clients =", wss.clients.size);
+wss.on("connection", (ws, req) => {
+  const url = new URL(req.url || "/", "http://localhost");
+  const mode = String(url.searchParams.get("mode") || "guest").toLowerCase();
+  const table = String(url.searchParams.get("table") || "").trim();
+  ws.clientRole = mode === "owner" ? "owner" : "guest";
+  ws.clientTable = table;
+
+  console.log(
+    "WebSocket connected. clients =",
+    wss.clients.size,
+    "role =",
+    ws.clientRole,
+    "table =",
+    ws.clientTable || "-"
+  );
 
   // 接続時に snapshot を1回送る（既存の buildSnapshot を使う）
-  ws.send(JSON.stringify(buildSnapshot()));
+  ws.send(JSON.stringify(snapshotForClient(ws)));
 
 
   ws.on("close", () => {
@@ -1946,7 +2064,7 @@ app.post("/api/rt/tables/:tableId/items", async (req, res) => {
     persistRtTableToDb(tableId, { orderedBy: line.addedBy ?? "owner" });
 
     // ★ 追加後に全端末へ snapshot 配信
-    broadcastSnapshot();
+    broadcastSnapshot({ tableId });
 
 
     // RT注文確定時も注文票を自動印刷
@@ -2001,7 +2119,7 @@ app.patch("/api/rt/tables/:tableId/items/:lineId", (req, res) => {
  persistRtTableToDb(tableId, { orderedBy: "owner" });
 
     // ★ 変更後に全端末へ snapshot 配信
-    broadcastSnapshot();
+    broadcastSnapshot({ tableId });
 
    
     res.json({ ok: true, line });
@@ -2063,7 +2181,7 @@ app.delete("/api/rt/tables/:tableId/items/:lineId", (req, res) => {
    persistRtTableToDb(tableId, { orderedBy: "owner" });
 
     // ★ 削除後に全端末へ snapshot 配信
-    broadcastSnapshot();
+    broadcastSnapshot({ tableId });
     res.json({ ok: true });
   } catch (e) {
     console.error("RT DELETE ERROR:", e);
@@ -2133,7 +2251,7 @@ app.post("/api/rt/tables/move", (req, res) => {
     hydrateRtSnapshotFromDb(from);
 
     // ⑦ snapshot送信
-    broadcastSnapshot();
+    broadcastSnapshot({ global: true });
 
     res.json({ ok: true });
  } catch (e) {
@@ -2155,7 +2273,7 @@ store.mergeTableOrderSnapshot(from, to);
     // RT表示系がDB優先読みに切り替わっているため、合算結果をDBにも同期する
     persistRtTableToDb(to, { orderedBy: "owner" });
     persistRtTableToDb(from, { orderedBy: "owner" });
-    broadcastSnapshot();
+    broadcastSnapshot({ global: true });
 
     res.json({ ok: true });
   } catch (e) {
@@ -2172,7 +2290,7 @@ app.post("/api/rt/tables/:tableId/start", (req, res) => {
   try {
     store.openTable(tableId);   // ★ 正本はサーバー
     hydrateRtSnapshotFromDb(tableId);
-    broadcastSnapshot();        // ★ 全端末に通知
+    broadcastSnapshot({ tableId });        // ★ 全端末に通知
     res.json({ ok: true });
   } catch (e) {
     res.status(400).json({ ok: false, error: e.message });
@@ -2188,7 +2306,7 @@ app.post("/api/rt/tables/:tableId/end", (req, res) => {
   try {
     store.closeTable(tableId);
    
-    broadcastSnapshot();
+    broadcastSnapshot({ tableId });
     res.json({ ok: true });
   } catch (e) {
     res.status(400).json({ ok: false, error: e.message });

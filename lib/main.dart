@@ -45,13 +45,72 @@ Future<void> main() async {
 
         // --- order / realtime ---
         ChangeNotifierProvider(create: (_) => orderState),
-        ChangeNotifierProvider(
-          create: (_) => RealtimeState(orderState),
-        ),
+        ChangeNotifierProvider(create: (_) => RealtimeState(orderState)),
       ],
-      child: const MyApp(),
+      child: const GlobalRealtimeRefresh(child: MyApp()),
     ),
   );
+}
+
+class GlobalRealtimeRefresh extends StatefulWidget {
+  final Widget child;
+
+  const GlobalRealtimeRefresh({super.key, required this.child});
+
+  @override
+  State<GlobalRealtimeRefresh> createState() => _GlobalRealtimeRefreshState();
+}
+
+class _GlobalRealtimeRefreshState extends State<GlobalRealtimeRefresh> {
+  RealtimeState? _realtime;
+  int _seenGlobalUpdateSeq = 0;
+  bool _refreshing = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final next = context.read<RealtimeState>();
+    if (_realtime == next) return;
+    _realtime?.removeListener(_handleRealtimeChanged);
+    _realtime = next;
+    _realtime?.addListener(_handleRealtimeChanged);
+  }
+
+  @override
+  void dispose() {
+    _realtime?.removeListener(_handleRealtimeChanged);
+    super.dispose();
+  }
+
+  void _handleRealtimeChanged() {
+    final realtime = _realtime;
+    if (realtime == null) return;
+    final seq = realtime.globalUpdateSeq;
+    if (seq <= 0 || seq == _seenGlobalUpdateSeq || _refreshing) return;
+
+    _seenGlobalUpdateSeq = seq;
+    _refreshing = true;
+    final menuData = context.read<MenuData>();
+    final castData = context.read<CastData>();
+    final castDrinkData = context.read<CastDrinkData>();
+    final promoState = context.read<PromoState>();
+    Future.microtask(() async {
+      try {
+        final kind = realtime.globalUpdateKind;
+        if (kind == 'menu') {
+          await menuData.load();
+          await Future.wait([castData.load(), castDrinkData.load()]);
+        } else if (kind == 'promos') {
+          await promoState.load();
+        }
+      } finally {
+        _refreshing = false;
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 class MyApp extends StatelessWidget {

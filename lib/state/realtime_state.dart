@@ -53,6 +53,8 @@ class RealtimeState extends ChangeNotifier with WidgetsBindingObserver {
   Timer? _snapshotTimeoutTimer;
   int _connectionGeneration = 0;
   int _reconnectAttempt = 0;
+  String _connectionMode = 'guest';
+  String? _connectionTable;
 
   RealtimeState(this.orderState) {
     WidgetsBinding.instance.addObserver(this);
@@ -72,6 +74,8 @@ class RealtimeState extends ChangeNotifier with WidgetsBindingObserver {
   Map<String, dynamic> ordersByTable = {};
   Map<String, dynamic> orderItems = {};
   List<PrintFailureNotice> printFailures = const [];
+  int globalUpdateSeq = 0;
+  String? globalUpdateKind;
 
   void applySnapshot(Map<String, dynamic> payload) {
     debugPrint('SNAPSHOT RECEIVED');
@@ -97,12 +101,16 @@ class RealtimeState extends ChangeNotifier with WidgetsBindingObserver {
               .where((e) => e.id.isNotEmpty)
               .toList()
         : const [];
+    globalUpdateSeq = int.tryParse('${payload['globalUpdateSeq'] ?? 0}') ?? 0;
+    globalUpdateKind = payload['globalUpdateKind']?.toString();
 
     orderState.applyRealtimeSnapshot(payload);
     notifyListeners();
   }
 
-  void connect({bool force = false}) {
+  void connect({bool force = false, String? mode, String? table}) {
+    if (mode != null) _connectionMode = mode;
+    if (table != null) _connectionTable = table;
     if (_connecting) return;
     if (_connected && !force) return;
 
@@ -121,6 +129,8 @@ class RealtimeState extends ChangeNotifier with WidgetsBindingObserver {
         if (generation != _connectionGeneration) return;
         applySnapshot(payload);
       },
+      mode: _connectionMode,
+      table: _connectionTable,
       onConnected: () {
         if (generation != _connectionGeneration) return;
         _snapshotTimeoutTimer = Timer(const Duration(seconds: 4), () {
@@ -157,6 +167,16 @@ class RealtimeState extends ChangeNotifier with WidgetsBindingObserver {
     final delay = delays[_reconnectAttempt.clamp(0, delays.length - 1)];
     _reconnectAttempt++;
     _reconnectTimer = Timer(delay, () => connect());
+  }
+
+  void connectAsOwner({bool force = true}) {
+    _connectionTable = null;
+    connect(force: force, mode: 'owner');
+  }
+
+  void connectAsGuest(String table, {bool force = true}) {
+    _connectionTable = table.trim();
+    connect(force: force, mode: 'guest', table: _connectionTable);
   }
 
   void reconnectNow() {
