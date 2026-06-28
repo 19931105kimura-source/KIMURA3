@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../billing/billing_calculator.dart';
 import '../state/app_state.dart';
 import '../state/order_state.dart';
 import '../state/realtime_state.dart';
-import '../utils/order_sort.dart';
 import '../utils/price_format.dart';
 import '../utils/print_failure_announcer.dart';
 import 'login_page.dart';
@@ -149,13 +147,8 @@ class _OwnerTablePageState extends State<OwnerTablePage> {
                 itemBuilder: (context, index) {
                   final table = tables[index];
                   final isActive = orderState.isActive(table);
-                  final hasOrder = orderState.hasOrder(table);
-                  final order = orderState.realtimeOrderForDisplay(table);
-                  final total = order == null
-                      ? 0
-                      : BillingCalculator.calculateFromLines(
-                          sortOrderLines(order.lines),
-                        ).total;
+                  final hasOrder = orderState.hasOrderSummary(table);
+                  final total = orderState.summaryTotalOf(table);
 
                   return _TableBigNumberCard(
                     table: table,

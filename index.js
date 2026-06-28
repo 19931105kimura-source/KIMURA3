@@ -1835,13 +1835,44 @@ app.post('/api/orders/sync-table', (req, res) => {
 // snapshot 作成（RT 正本）
 // =========================
 function buildSnapshot() {
-  const payload = store.buildRealtimeSnapshot();
+  const payload = buildOwnerSummarySnapshot();
   payload.printFailures = printFailures;
   payload.globalUpdateSeq = globalUpdateSeq;
   payload.globalUpdateKind = lastGlobalUpdateKind;
   return {
     type: "snapshot",
     payload, // ★ ここが正本
+  };
+}
+
+function buildOwnerSummarySnapshot() {
+  const tables = {};
+
+  for (const [tableId, table] of store.tables.entries()) {
+    const items = getTableItems(tableId);
+    const billableSummary = calcReceiptSummary(tableId);
+    const itemCount = items.reduce((sum, item) => {
+      const qty = Number(item?.quantity ?? item?.qty ?? 0);
+      return sum + (Number.isFinite(qty) && qty > 0 ? qty : 0);
+    }, 0);
+
+    tables[tableId] = {
+      tableId,
+      status: table.status,
+      openedAt: table.openedAt,
+      summary: {
+        total: billableSummary.total,
+        itemCount,
+        lineCount: items.length,
+      },
+    };
+  }
+
+  return {
+    tables,
+    ordersByTable: {},
+    orderItems: {},
+    at: new Date().toISOString(),
   };
 }
 
@@ -1982,6 +2013,17 @@ wss.on("connection", (ws, req) => {
 server.listen(3000, () => {
   console.log("server started :3000");
 });
+
+app.get("/api/rt/tables/:tableId/detail", (req, res) => {
+  try {
+    const { tableId } = req.params;
+    res.json(buildTableSnapshot(tableId).payload);
+  } catch (e) {
+    console.error("RT TABLE DETAIL ERROR:", e);
+    res.status(500).json({ success: false, error: "table detail failed" });
+  }
+});
+
 // =========================
 // RT 注文：追加（tableOrders 用）
 // =========================

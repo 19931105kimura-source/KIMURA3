@@ -22,6 +22,47 @@ class OwnerTableCenterPanel extends StatefulWidget {
 
 class _OwnerTableCenterPanelState extends State<OwnerTableCenterPanel> {
   bool _printing = false;
+  bool _loadingDetail = false;
+  String? _detailLoadedFor;
+  String? _lastDetailSummaryKey;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadTableDetail());
+  }
+
+  @override
+  void didUpdateWidget(covariant OwnerTableCenterPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.table != widget.table) {
+      _detailLoadedFor = null;
+      _lastDetailSummaryKey = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _loadTableDetail());
+    }
+  }
+
+  String _summaryKey(OrderState orderState) {
+    return '${orderState.summaryItemCountOf(widget.table)}:${orderState.summaryTotalOf(widget.table)}';
+  }
+
+  Future<void> _loadTableDetail({bool force = false}) async {
+    if (!mounted || _loadingDetail) return;
+    if (!force && _detailLoadedFor == widget.table) return;
+    final summaryKey = _summaryKey(context.read<OrderState>());
+    setState(() => _loadingDetail = true);
+    final loaded = await context.read<OrderState>().fetchRealtimeTableDetail(
+      widget.table,
+    );
+    if (!mounted) return;
+    setState(() {
+      _loadingDetail = false;
+      if (loaded) {
+        _detailLoadedFor = widget.table;
+        _lastDetailSummaryKey = summaryKey;
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -44,6 +85,15 @@ class _OwnerTableCenterPanelState extends State<OwnerTableCenterPanel> {
     final billing = displayOrder == null
         ? null
         : BillingCalculator.calculateFromLines(displayOrder.lines);
+    final currentSummaryKey = _summaryKey(orderState);
+    if (_detailLoadedFor == widget.table &&
+        _lastDetailSummaryKey != null &&
+        _lastDetailSummaryKey != currentSummaryKey &&
+        !_loadingDetail) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _loadTableDetail(force: true),
+      );
+    }
 
     return Padding(
       padding: const EdgeInsets.all(20),
@@ -106,6 +156,11 @@ class _OwnerTableCenterPanelState extends State<OwnerTableCenterPanel> {
           ],
 
           const Divider(height: 32),
+
+          if (_loadingDetail) ...[
+            const LinearProgressIndicator(minHeight: 3),
+            const SizedBox(height: 12),
+          ],
 
           // ===== 会計表示 =====
           Column(
@@ -266,7 +321,7 @@ class _OwnerTableCenterPanelState extends State<OwnerTableCenterPanel> {
               ),
 
               OutlinedButton(
-                onPressed: (orderData == null || orderData.lines.isEmpty)
+                onPressed: (displayOrder == null || displayOrder.lines.isEmpty)
                     ? null
                     : () async {
                         final to = await _selectTableDialog(
@@ -282,7 +337,7 @@ class _OwnerTableCenterPanelState extends State<OwnerTableCenterPanel> {
               ),
 
               OutlinedButton(
-                onPressed: (orderData == null || orderData.lines.isEmpty)
+                onPressed: (displayOrder == null || displayOrder.lines.isEmpty)
                     ? null
                     : () async {
                         final to = await _selectTableDialog(
@@ -307,8 +362,8 @@ class _OwnerTableCenterPanelState extends State<OwnerTableCenterPanel> {
               ElevatedButton(
                 onPressed:
                     !_printing &&
-                        orderData != null &&
-                        orderData.lines.isNotEmpty
+                        displayOrder != null &&
+                        displayOrder.lines.isNotEmpty
                     ? () async {
                         await _printReceipt(context, widget.table);
                       }
@@ -406,8 +461,7 @@ class _OwnerTableCenterPanelState extends State<OwnerTableCenterPanel> {
     final tables = orderState.tables.where((t) {
       if (t == exclude) return false;
       if (onlyWithOrder) {
-        final o = orderState.orderOf(t);
-        return o != null && o.lines.isNotEmpty;
+        return orderState.hasOrderSummary(t);
       }
       return true;
     }).toList();

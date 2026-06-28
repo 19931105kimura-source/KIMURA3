@@ -318,39 +318,54 @@ class OrderState extends ChangeNotifier {
     });
 
     // ★ ② RTを正本として orders を組み直す
-    final List<Order> newOrders = [];
+    final hasDetailedOrders =
+        realtimeOrdersByTable.isNotEmpty || realtimeOrderItems.isNotEmpty;
 
-    realtimeOrdersByTable.forEach((table, orderIds) {
-      if (orderIds is! List) return;
+    if (hasDetailedOrders) {
+      final List<Order> newOrders = [];
 
-      final List<OrderLine> lines = [];
+      realtimeOrdersByTable.forEach((table, orderIds) {
+        if (orderIds is! List) return;
 
-      for (final orderId in orderIds) {
-        final rawLines = realtimeOrderItems[orderId];
-        if (rawLines is! List) continue;
+        final List<OrderLine> lines = [];
 
-        for (final raw in rawLines) {
-          if (raw is Map<String, dynamic>) {
-            lines.add(OrderLine.fromJson(raw));
+        for (final orderId in orderIds) {
+          final rawLines = realtimeOrderItems[orderId];
+          if (rawLines is! List) continue;
+
+          for (final raw in rawLines) {
+            if (raw is Map<String, dynamic>) {
+              lines.add(OrderLine.fromJson(raw));
+            }
           }
         }
-      }
 
-      if (lines.isEmpty) return;
+        if (lines.isEmpty) return;
 
-      newOrders.add(
-        Order(
-          id: 'rt_$table',
-          table: table,
-          createdAt: DateTime.now(),
-          lines: lines,
-        ),
-      );
-    });
+        newOrders.add(
+          Order(
+            id: 'rt_$table',
+            table: table,
+            createdAt: DateTime.now(),
+            lines: lines,
+          ),
+        );
+      });
 
-    _orders
-      ..clear()
-      ..addAll(newOrders);
+      _orders
+        ..clear()
+        ..addAll(newOrders);
+    } else {
+      tableMap.forEach((tableId, data) {
+        if (data is! Map) return;
+        final status = data['status']?.toString();
+        final summary = data['summary'];
+        final itemCount = summary is Map ? _toInt(summary['itemCount']) : 0;
+        if (status != 'ordering' || itemCount <= 0) {
+          _orders.removeWhere((order) => order.table == tableId.toString());
+        }
+      });
+    }
 
     notifyListeners();
   }
@@ -386,6 +401,98 @@ class OrderState extends ChangeNotifier {
       }
     }
     return count;
+  }
+
+  int summaryItemCountOf(String table) {
+    final rt = realtimeTables[table];
+    if (rt is Map) {
+      final summary = rt['summary'];
+      if (summary is Map) return _toInt(summary['itemCount']);
+    }
+
+    final order = realtimeOrderForDisplay(table) ?? orderOf(table);
+    if (order == null) return 0;
+    return order.lines.fold<int>(0, (sum, line) => sum + line.qty);
+  }
+
+  int summaryTotalOf(String table) {
+    final rt = realtimeTables[table];
+    if (rt is Map) {
+      final summary = rt['summary'];
+      if (summary is Map) return _toInt(summary['total']);
+    }
+
+    final order = realtimeOrderForDisplay(table) ?? orderOf(table);
+    return order?.total ?? 0;
+  }
+
+  bool hasOrderSummary(String table) {
+    return summaryItemCountOf(table) > 0 ||
+        (realtimeOrderForDisplay(table)?.lines.isNotEmpty ?? false) ||
+        (orderOf(table)?.lines.isNotEmpty ?? false);
+  }
+
+  Future<bool> fetchRealtimeTableDetail(String table) async {
+    try {
+      final encoded = Uri.encodeComponent(table);
+      final uri = ServerConfig.api('/api/rt/tables/$encoded/detail');
+      final res = await http.get(uri).timeout(const Duration(seconds: 8));
+      if (res.statusCode < 200 || res.statusCode >= 300) return false;
+
+      final body = jsonDecode(res.body);
+      if (body is! Map) return false;
+
+      applyRealtimeTableDetail(Map<String, dynamic>.from(body));
+      return true;
+    } catch (e) {
+      debugPrint('FETCH RT TABLE DETAIL ERROR: $e');
+      return false;
+    }
+  }
+
+  void applyRealtimeTableDetail(Map<String, dynamic> payload) {
+    _needsResync = false;
+    _lastSyncedAt = DateTime.now();
+
+    final tables = Map<String, dynamic>.from(payload['tables'] ?? {});
+    final affectedTables = tables.keys.map((e) => e.toString()).toSet();
+
+    tables.forEach((tableId, data) {
+      final key = tableId.toString();
+      realtimeTables[key] = data;
+      if (data is Map && data['status'] is String) {
+        realtimeTableStatus[key] = data['status'];
+        if (data['status'] == 'ordering') {
+          _activeTables.add(key);
+        } else {
+          _activeTables.remove(key);
+        }
+      }
+    });
+
+    final nextOrdersByTable = Map<String, dynamic>.from(
+      payload['ordersByTable'] ?? {},
+    );
+    final nextOrderItems = Map<String, dynamic>.from(
+      payload['orderItems'] ?? {},
+    );
+
+    nextOrdersByTable.forEach((tableId, orderIds) {
+      realtimeOrdersByTable[tableId.toString()] = orderIds;
+    });
+    nextOrderItems.forEach((orderId, items) {
+      realtimeOrderItems[orderId.toString()] = items;
+    });
+
+    for (final table in affectedTables) {
+      _orders.removeWhere((order) => order.table == table);
+      final rtOrder = _buildRealtimeOrder(table);
+      if (rtOrder != null) {
+        _orders.add(rtOrder);
+      }
+    }
+
+    notifyListeners();
   }
 
   // ===================
@@ -1503,8 +1610,7 @@ class OrderState extends ChangeNotifier {
   // テーブルに注文があるか
   // ===================
   bool hasOrder(String table) {
-    final o = orderOf(table);
-    return o != null && o.lines.isNotEmpty;
+    return hasOrderSummary(table);
   }
 
   // ===================
