@@ -2,15 +2,31 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../state/order_state.dart';
+import '../state/realtime_state.dart';
 import '../utils/price_format.dart';
 
-class OwnerSeatStatusPage extends StatelessWidget {
+class OwnerSeatStatusPage extends StatefulWidget {
   const OwnerSeatStatusPage({super.key});
 
+  @override
+  State<OwnerSeatStatusPage> createState() => _OwnerSeatStatusPageState();
+}
+
+class _OwnerSeatStatusPageState extends State<OwnerSeatStatusPage> {
   static const _bgTop = Color(0xFF0F172A);
   static const _bgBottom = Color(0xFF111827);
   static const _accent = Color(0xFF22D3EE);
   static const _accent2 = Color(0xFF6366F1);
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<RealtimeState>().connectAsOwner();
+      context.read<OrderState>().refreshTablesFromServer();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
