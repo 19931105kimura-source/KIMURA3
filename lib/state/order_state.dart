@@ -1477,12 +1477,7 @@ class OrderState extends ChangeNotifier {
     _lastSubmitError = null;
     _lastSubmitStatusCode = null;
 
-    if (!canSubmitOrders) {
-      _lastSubmitError = 'resync_required';
-      return false;
-    }
-
-    if (!canOrderTable(table)) {
+    if (!_isTableOrderingForOwnerEdit(table)) {
       _lastSubmitError = 'table_not_ordering';
       return false;
     }
@@ -1512,12 +1507,25 @@ class OrderState extends ChangeNotifier {
     final sent = await sendOrderToServer(
       requestOrder,
       linesToSend: [deltaLine],
+      requireFreshSync: false,
     );
     if (!sent) {
       return false;
     }
 
     return true;
+  }
+
+  bool _isTableOrderingForOwnerEdit(String table) {
+    final status = realtimeTableStatus[table];
+    if (status != null) return status == 'ordering';
+
+    final rt = realtimeTables[table];
+    if (rt is Map && rt['status'] != null) {
+      return rt['status'] == 'ordering';
+    }
+
+    return _activeTables.contains(table);
   }
 
   // ===================
@@ -1693,11 +1701,12 @@ class OrderState extends ChangeNotifier {
     Order order, {
     List<OrderLine>? linesToSend,
     String? requestId,
+    bool requireFreshSync = true,
   }) async {
     debugPrint('SEND ORDER START'); // ← これを追加
     _lastSubmitStatusCode = null;
     try {
-      if (!canSubmitOrders) {
+      if (requireFreshSync && !canSubmitOrders) {
         _lastSubmitError = 'resync_required';
         return false;
       }
