@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 
 import '../state/order_state.dart';
 import '../utils/price_format.dart';
-import '../../billing/billing_calculator.dart';
 
 class OwnerSeatStatusPage extends StatelessWidget {
   const OwnerSeatStatusPage({super.key});
@@ -60,10 +59,7 @@ class OwnerSeatStatusPage extends StatelessWidget {
                 itemCount: activeTables.length,
                 itemBuilder: (context, index) {
                   final table = activeTables[index];
-                  final order = orderState.orderForDisplay(table);
-                  final total = order == null
-                      ? 0
-                      : BillingCalculator.calculateFromLines(order.lines).total;
+                  final total = orderState.summaryTotalOf(table);
 
                   return Container(
                     decoration: BoxDecoration(
@@ -106,8 +102,9 @@ class OwnerSeatStatusPage extends StatelessWidget {
                           ),
                           Center(
                             child: Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 8),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                              ),
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
@@ -115,8 +112,9 @@ class OwnerSeatStatusPage extends StatelessWidget {
                                     '会計金額',
                                     style: TextStyle(
                                       fontSize: 14,
-                                      color: Colors.white
-                                          .withValues(alpha: 0.74),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.74,
+                                      ),
                                     ),
                                   ),
                                   const SizedBox(height: 6),
