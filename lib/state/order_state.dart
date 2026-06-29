@@ -1084,8 +1084,11 @@ class OrderState extends ChangeNotifier {
     }
 
     if (!canSubmitOrders) {
-      _lastSubmitError = 'resync_required';
-      return false;
+      final recovered = await fetchRealtimeTableDetail(table);
+      if (!recovered || !canSubmitOrders) {
+        _lastSubmitError = 'resync_required';
+        return false;
+      }
     }
 
     if (!canOrderTable(table)) {

@@ -53,12 +53,7 @@ class CartPage extends StatelessWidget {
 
     final isSubmitting = orderState.orderSubmitInProgress;
     final realtimeReady = realtime.canSubmitWithRecentSnapshot;
-    final canOrder =
-        table != null &&
-        orderState.isActive(table) &&
-        orderState.canSubmitOrders &&
-        realtimeReady &&
-        !isSubmitting;
+    final canOrder = table != null && !isSubmitting;
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -223,12 +218,6 @@ class CartPage extends StatelessWidget {
   Future<void> _confirmOrder(BuildContext context, CartState cart) async {
     final orderState = context.read<OrderState>();
     final table = context.read<AppState>().guestTable;
-    final realtime = context.read<RealtimeState>();
-    final connected = realtime.canSubmitWithRecentSnapshot;
-
-    final isActive = table != null && orderState.isActive(table);
-    final canSubmit = orderState.canSubmitOrders;
-
     if (orderState.orderSubmitInProgress) {
       ScaffoldMessenger.of(
         context,
@@ -236,16 +225,21 @@ class CartPage extends StatelessWidget {
       return;
     }
 
-    if (!isActive || !canSubmit || !connected) {
-      final detail = _buildFailureDetail(
-        table: table,
-        isActive: isActive,
-        canSubmitOrders: canSubmit,
-        connected: connected,
+    if (table == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _buildFailureDetail(
+              table: table,
+              isActive: false,
+              canSubmitOrders: orderState.canSubmitOrders,
+              connected: context
+                  .read<RealtimeState>()
+                  .canSubmitWithRecentSnapshot,
+            ),
+          ),
+        ),
       );
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(detail)));
       return;
     }
 
@@ -272,6 +266,10 @@ class CartPage extends StatelessWidget {
     final sent = await orderState.addFromCart(cart, table);
 
     if (!context.mounted) return;
+    final realtime = context.read<RealtimeState>();
+    final connected = realtime.canSubmitWithRecentSnapshot;
+    final isActive = orderState.isActive(table);
+    final canSubmit = orderState.canSubmitOrders;
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
