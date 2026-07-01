@@ -378,6 +378,7 @@ class OrderState extends ChangeNotifier {
   Map<String, dynamic> realtimeOrderItems = {};
   // ★ Realtime：テーブル状態（status の正本）
   Map<String, dynamic> realtimeTables = {};
+  final Map<String, int> _tableMutationVersions = {};
 
   /// テーブル一覧（正本はサーバー）
   final List<String> _tables = [..._defaultTables];
@@ -436,6 +437,7 @@ class OrderState extends ChangeNotifier {
 
   Future<bool> fetchRealtimeTableDetail(String table) async {
     try {
+      final requestVersion = _tableMutationVersion(table);
       final encoded = Uri.encodeComponent(table);
       final uri = ServerConfig.api('/api/rt/tables/$encoded/detail');
       final res = await http.get(uri).timeout(const Duration(seconds: 8));
@@ -443,6 +445,11 @@ class OrderState extends ChangeNotifier {
 
       final body = jsonDecode(res.body);
       if (body is! Map) return false;
+
+      if (requestVersion != _tableMutationVersion(table)) {
+        debugPrint('SKIP STALE RT TABLE DETAIL: $table');
+        return false;
+      }
 
       applyRealtimeTableDetail(Map<String, dynamic>.from(body));
       return true;
@@ -495,6 +502,14 @@ class OrderState extends ChangeNotifier {
     }
 
     notifyListeners();
+  }
+
+  int _tableMutationVersion(String table) {
+    return _tableMutationVersions[table] ?? 0;
+  }
+
+  void _bumpTableMutationVersion(String table) {
+    _tableMutationVersions[table] = _tableMutationVersion(table) + 1;
   }
 
   // ===================
@@ -1337,12 +1352,14 @@ class OrderState extends ChangeNotifier {
     String? archivedHistoryId;
     var serverDeleteCommitted = false;
     try {
+      _bumpTableMutationVersion(targetOrder.table);
       archivedHistoryId = await _archiveDeletedOrder(targetOrder);
       if (archivedHistoryId == null) {
         throw Exception('archive deleted order failed');
       }
 
       final targetTable = targetOrder.table;
+      _bumpTableMutationVersion(targetTable);
       final remainingLinesOnTable = _orders
           .where((o) => o.id != targetOrder.id && o.table == targetTable)
           .expand((o) => o.lines)
@@ -1377,6 +1394,7 @@ class OrderState extends ChangeNotifier {
     String? archivedHistoryId;
     var serverDeleteCommitted = false;
     try {
+      _bumpTableMutationVersion(table);
       archivedHistoryId = await _archiveDeletedOrder(targetOrder);
       if (archivedHistoryId == null) {
         throw Exception('archive deleted order failed');
