@@ -152,6 +152,15 @@ const pendingOrderRequests = new Map(); // requestId -> { promise, resolve, expi
 const REQUEST_TTL_MS = 1000 * 60 * 30;
 
 
+function orderLog(label, fields = {}) {
+  const parts = [`[ORDER_API] ${label}`];
+  for (const [key, value] of Object.entries(fields)) {
+    if (value === undefined || value === null || value === "") continue;
+    parts.push(`${key}=${value}`);
+  }
+  console.log(parts.join(" "));
+}
+
 function rememberOrderRequest(requestId, payload) {
   processedOrderRequests.set(requestId, {
     payload,
@@ -637,10 +646,23 @@ async function printOrderSlip({ tableId, target, items }) {
   return { printed: printableItems.length, target: normalizedTarget };
 }
 
-async function runOrderAutoPrint({ tableId, printTargets, printDeltaItems }) {
+async function runOrderAutoPrint({
+  tableId,
+  printTargets,
+  printDeltaItems,
+  requestId = "",
+}) {
+  const startedAt = Date.now();
+  orderLog("print_start", {
+    requestId,
+    tableId,
+    targets: printTargets.join(","),
+    items: printDeltaItems.length,
+  });
   let hasFailure = false;
 
   for (const target of printTargets) {
+    const targetStartedAt = Date.now();
     const targetItems = printDeltaItems.filter((item) =>
       shouldPrintToTarget(item, target) &&
       item.shouldPrint !== false
@@ -651,8 +673,23 @@ async function runOrderAutoPrint({ tableId, printTargets, printDeltaItems }) {
         target,
         items: targetItems,
       });
+      orderLog("print_target_done", {
+        requestId,
+        tableId,
+        target,
+        items: targetItems.length,
+        elapsedMs: Date.now() - targetStartedAt,
+      });
     } catch (e) {
       hasFailure = true;
+      orderLog("print_target_error", {
+        requestId,
+        tableId,
+        target,
+        items: targetItems.length,
+        elapsedMs: Date.now() - targetStartedAt,
+        error: e?.message || String(e),
+      });
       console.error("ORDER AUTO PRINT ERROR:", e);
       recordPrintFailure({
         tableId,
@@ -666,6 +703,12 @@ async function runOrderAutoPrint({ tableId, printTargets, printDeltaItems }) {
   if (hasFailure) {
     broadcastSnapshot({ tableId });
   }
+  orderLog("print_done", {
+    requestId,
+    tableId,
+    elapsedMs: Date.now() - startedAt,
+    failed: hasFailure,
+  });
 }
 
 
@@ -1524,17 +1567,29 @@ app.post("/api/promos/delete-file", (req, res) => {
 // 注文確定（最小・ダミー）
 // =========================
  app.post("/api/orders",  async(req, res) => {
+  const apiStartedAt = Date.now();
 
   const requestId = String(req.body.requestId ?? "").trim();
+  const tableId = String(req.body.tableId ?? req.body.table ?? "").trim();
+  orderLog("received", {
+    requestId,
+    tableId,
+    orderedBy: req.body.orderedBy ?? "guest",
+    bodyKeys: Object.keys(req.body || {}).join(","),
+  });
   if (requestId) {
     const remembered = getRememberedOrderRequest(requestId);
     if (remembered) {
+      orderLog("duplicate_remembered", {
+        requestId,
+        tableId,
+        elapsedMs: Date.now() - apiStartedAt,
+      });
       return res.json(remembered);
     }
   }
 
  // Flutter 側の payload が items/lines/order のどれでも動くように吸収
-  const tableId = String(req.body.tableId ?? req.body.table ?? "").trim();
   const rawItems =
     (Array.isArray(req.body.items) && req.body.items) ||
     (Array.isArray(req.body.lines) && req.body.lines) ||
@@ -1579,6 +1634,13 @@ app.post("/api/promos/delete-file", (req, res) => {
   }
 
   if (validationErrors.length > 0) {
+     orderLog("validation_failed", {
+      requestId,
+      tableId,
+      items: rawItems.length,
+      elapsedMs: Date.now() - apiStartedAt,
+      details: validationErrors.join("|"),
+    });
      console.warn("ORDER VALIDATION FAILED", {
       requestId,
       tableId,
@@ -1598,13 +1660,30 @@ let pendingOrderRequest = null;
 if (requestId) {
   const pending = getPendingOrderRequest(requestId);
   if (pending) {
+    orderLog("duplicate_pending_wait", {
+      requestId,
+      tableId,
+      elapsedMs: Date.now() - apiStartedAt,
+    });
     const result = await pending;
+    orderLog("duplicate_pending_done", {
+      requestId,
+      tableId,
+      status: result.status,
+      elapsedMs: Date.now() - apiStartedAt,
+    });
     return res.status(result.status).json(result.payload);
   }
   pendingOrderRequest = createPendingOrderRequest(requestId);
 }
 
+const openStartedAt = Date.now();
 store.openTable(tableId);
+orderLog("table_opened", {
+  requestId,
+  tableId,
+  elapsedMs: Date.now() - openStartedAt,
+});
 
 
 
@@ -1621,6 +1700,7 @@ store.openTable(tableId);
   const printDeltaItems = [];
 
 try {
+    const itemsStartedAt = Date.now();
     rawItems.forEach((it, idx) => {
       const itemId = `item_${Date.now()}_${idx}`;
 
@@ -1738,7 +1818,20 @@ try {
         rtLineId,
       });
     });
+    orderLog("items_saved", {
+      requestId,
+      tableId,
+      items: rawItems.length,
+      printItems: printDeltaItems.length,
+      elapsedMs: Date.now() - itemsStartedAt,
+    });
   } catch (e) {
+    orderLog("items_save_failed", {
+      requestId,
+      tableId,
+      elapsedMs: Date.now() - apiStartedAt,
+      error: e?.message || String(e),
+    });
     console.error("ORDER PROCESSING ERROR", {
       message: e?.message,
       tableId,
@@ -1758,13 +1851,25 @@ try {
 
    store.orderItemsByOrder.set(orderId, itemIds);
 
-  
+   
   try {
+    const persistStartedAt = Date.now();
     // `/api/orders` でも RT スナップショット（tableOrders）を正として
     // DB をテーブル単位で置換する。差分 upsert の取りこぼしで
     // 同一商品の重複行が残るのを防ぐ。
     persistRtTableToDb(tableId, { orderedBy: req.body.orderedBy ?? "guest" });
+    orderLog("db_persisted", {
+      requestId,
+      tableId,
+      elapsedMs: Date.now() - persistStartedAt,
+    });
   } catch (e) {
+    orderLog("db_persist_failed", {
+      requestId,
+      tableId,
+      elapsedMs: Date.now() - apiStartedAt,
+      error: e?.message || String(e),
+    });
     console.error("ORDER SQLITE PERSIST ERROR", {
       orderId,
       tableId,
@@ -1782,7 +1887,13 @@ try {
   );
 
   // ⑦ 全端末に snapshot 配信
+  const broadcastStartedAt = Date.now();
   broadcastSnapshot({ tableId });
+  orderLog("snapshot_broadcasted", {
+    requestId,
+    tableId,
+    elapsedMs: Date.now() - broadcastStartedAt,
+  });
 
   const responsePayload = {
     ok: true,
@@ -1797,9 +1908,28 @@ try {
     pendingOrderRequest.resolve(200, responsePayload);
   }
 
+  orderLog("response_sent", {
+    requestId,
+    tableId,
+    orderId,
+    items: itemIds.length,
+    printTargets: printTargets.join(","),
+    elapsedMs: Date.now() - apiStartedAt,
+  });
   res.json(responsePayload);
 
-  runOrderAutoPrint({ tableId, printTargets, printDeltaItems }).catch((e) => {
+  runOrderAutoPrint({
+    tableId,
+    printTargets,
+    printDeltaItems,
+    requestId,
+  }).catch((e) => {
+    orderLog("print_background_error", {
+      requestId,
+      tableId,
+      elapsedMs: Date.now() - apiStartedAt,
+      error: e?.message || String(e),
+    });
     console.error("ORDER BACKGROUND PRINT ERROR:", e);
   });
 

@@ -1096,19 +1096,47 @@ class OrderState extends ChangeNotifier {
   Future<bool> addFromCart(CartState cart, String table) async {
     _lastSubmitError = null;
     _lastSubmitStatusCode = null;
+    final submitStartedAt = DateTime.now();
+    _logOrderSubmit('cart_pressed', table: table, itemCount: cart.items.length);
 
     if (_orderSubmitInProgress) {
       _lastSubmitError = 'order_in_progress';
+      _logOrderSubmit(
+        'blocked_before_send',
+        table: table,
+        reason: _lastSubmitError,
+        itemCount: cart.items.length,
+        elapsed: DateTime.now().difference(submitStartedAt),
+      );
       notifyListeners();
       return false;
     }
 
     if (!canSubmitOrders) {
+      _logOrderSubmit(
+        'resync_start',
+        table: table,
+        itemCount: cart.items.length,
+        elapsed: DateTime.now().difference(submitStartedAt),
+      );
       final recovered = await fetchRealtimeTableDetail(table);
       if (!recovered || !canSubmitOrders) {
         _lastSubmitError = 'resync_required';
+        _logOrderSubmit(
+          'blocked_before_send',
+          table: table,
+          reason: _lastSubmitError,
+          itemCount: cart.items.length,
+          elapsed: DateTime.now().difference(submitStartedAt),
+        );
         return false;
       }
+      _logOrderSubmit(
+        'resync_success',
+        table: table,
+        itemCount: cart.items.length,
+        elapsed: DateTime.now().difference(submitStartedAt),
+      );
     }
 
     if (!canOrderTable(table)) {
@@ -1127,10 +1155,24 @@ class OrderState extends ChangeNotifier {
 
     if (!canOrderTable(table)) {
       _lastSubmitError = 'table_not_ordering';
+      _logOrderSubmit(
+        'blocked_before_send',
+        table: table,
+        reason: _lastSubmitError,
+        itemCount: cart.items.length,
+        elapsed: DateTime.now().difference(submitStartedAt),
+      );
       return false;
     }
     if (cart.items.isEmpty) {
       _lastSubmitError = 'cart_empty';
+      _logOrderSubmit(
+        'blocked_before_send',
+        table: table,
+        reason: _lastSubmitError,
+        itemCount: cart.items.length,
+        elapsed: DateTime.now().difference(submitStartedAt),
+      );
       return false;
     }
 
@@ -1199,12 +1241,28 @@ class OrderState extends ChangeNotifier {
       // ✅ ここを追加
 
       final requestId = cart.requestIdForTable(table);
+      _logOrderSubmit(
+        'send_call',
+        requestId: requestId,
+        table: table,
+        itemCount: deltaLines.length,
+        elapsed: DateTime.now().difference(submitStartedAt),
+      );
       final sent = await sendOrderToServer(
         order,
         linesToSend: deltaLines,
         requestId: requestId,
       );
       if (!sent) {
+        _logOrderSubmit(
+          'send_failed_rollback',
+          requestId: requestId,
+          table: table,
+          reason: _lastSubmitError,
+          statusCode: _lastSubmitStatusCode,
+          itemCount: deltaLines.length,
+          elapsed: DateTime.now().difference(submitStartedAt),
+        );
         if (createdOrder) {
           _orders.removeWhere((o) => o.id == order!.id);
         } else if (previousLines != null) {
@@ -1219,6 +1277,13 @@ class OrderState extends ChangeNotifier {
 
       cart.clear();
       await _save();
+      _logOrderSubmit(
+        'cart_success',
+        requestId: requestId,
+        table: table,
+        itemCount: deltaLines.length,
+        elapsed: DateTime.now().difference(submitStartedAt),
+      );
       notifyListeners();
       return true;
     } finally {
@@ -1733,11 +1798,35 @@ class OrderState extends ChangeNotifier {
   // ===================
   String _nextRequestId() {
     const max = 0x7fffffff;
-    debugPrint('REQID START max=$max');
     final n = Random().nextInt(max);
-    final id = '${DateTime.now().microsecondsSinceEpoch}_$n';
-    debugPrint('REQID OK id=$id');
-    return id;
+    return '${DateTime.now().microsecondsSinceEpoch}_$n';
+  }
+
+  void _logOrderSubmit(
+    String phase, {
+    String? requestId,
+    String? table,
+    String? reason,
+    int? statusCode,
+    int? itemCount,
+    Duration? elapsed,
+    Object? error,
+  }) {
+    debugPrint(
+      '[ORDER_SUBMIT] phase=$phase'
+      '${requestId == null ? '' : ' requestId=$requestId'}'
+      '${table == null ? '' : ' table=$table'}'
+      '${reason == null ? '' : ' reason=$reason'}'
+      '${statusCode == null ? '' : ' status=$statusCode'}'
+      '${itemCount == null ? '' : ' items=$itemCount'}'
+      '${elapsed == null ? '' : ' elapsedMs=${elapsed.inMilliseconds}'}'
+      ' canSubmit=$canSubmitOrders'
+      ' fresh=$hasFreshSnapshot'
+      ' needsResync=$_needsResync'
+      ' inProgress=$_orderSubmitInProgress'
+      '${_lastSyncedAt == null ? '' : ' lastSyncedAt=${_lastSyncedAt!.toIso8601String()}'}'
+      '${error == null ? '' : ' error=$error'}',
+    );
   }
 
   Future<bool> sendOrderToServer(
@@ -1746,31 +1835,43 @@ class OrderState extends ChangeNotifier {
     String? requestId,
     bool requireFreshSync = true,
   }) async {
-    debugPrint('SEND ORDER START'); // ← これを追加
     _lastSubmitStatusCode = null;
+    final startedAt = DateTime.now();
+    final lines = linesToSend ?? order.lines;
+    final resolvedRequestId = requestId ?? _nextRequestId();
+    _logOrderSubmit(
+      'send_prepare',
+      requestId: resolvedRequestId,
+      table: order.table,
+      itemCount: lines.length,
+    );
     try {
       if (requireFreshSync && !canSubmitOrders) {
         _lastSubmitError = 'resync_required';
+        _logOrderSubmit(
+          'blocked_before_http',
+          requestId: resolvedRequestId,
+          table: order.table,
+          reason: _lastSubmitError,
+          itemCount: lines.length,
+          elapsed: DateTime.now().difference(startedAt),
+        );
         return false;
       }
       final uri = ServerConfig.api('/api/orders');
-      final lines = linesToSend ?? order.lines;
-      debugPrint('SEND ORDER PHASE 1 uri=$uri lines=${lines.length}');
-
-      late final String resolvedRequestId;
-      try {
-        resolvedRequestId = requestId ?? _nextRequestId();
-      } catch (e, st) {
-        debugPrint('SEND ORDER FAIL PHASE=requestId error=$e');
-        debugPrint('$st');
-        rethrow;
-      }
 
       late final List<Map<String, dynamic>> items;
       try {
         items = lines.map((l) => l.toServerItem()).toList();
       } catch (e, st) {
-        debugPrint('SEND ORDER FAIL PHASE=toServerItem error=$e');
+        _logOrderSubmit(
+          'build_payload_failed',
+          requestId: resolvedRequestId,
+          table: order.table,
+          itemCount: lines.length,
+          elapsed: DateTime.now().difference(startedAt),
+          error: e,
+        );
         debugPrint('$st');
         rethrow;
       }
@@ -1786,27 +1887,62 @@ class OrderState extends ChangeNotifier {
       try {
         body = jsonEncode(payload);
       } catch (e, st) {
-        debugPrint('SEND ORDER FAIL PHASE=jsonEncode error=$e');
+        _logOrderSubmit(
+          'json_encode_failed',
+          requestId: resolvedRequestId,
+          table: order.table,
+          itemCount: items.length,
+          elapsed: DateTime.now().difference(startedAt),
+          error: e,
+        );
         debugPrint('$st');
         rethrow;
       }
 
+      _logOrderSubmit(
+        'http_start',
+        requestId: resolvedRequestId,
+        table: order.table,
+        itemCount: items.length,
+      );
       final res = await http
           .post(uri, headers: {'Content-Type': 'application/json'}, body: body)
           .timeout(const Duration(seconds: 15));
 
-      debugPrint('RES /api/orders status=${res.statusCode}');
-
       if (res.statusCode != 200) {
         _lastSubmitError = 'server_rejected';
         _lastSubmitStatusCode = res.statusCode;
+        _logOrderSubmit(
+          'http_rejected',
+          requestId: resolvedRequestId,
+          table: order.table,
+          statusCode: res.statusCode,
+          itemCount: items.length,
+          elapsed: DateTime.now().difference(startedAt),
+        );
         throw Exception('order send failed');
       }
       _lastSubmitError = null;
+      _logOrderSubmit(
+        'http_success',
+        requestId: resolvedRequestId,
+        table: order.table,
+        statusCode: res.statusCode,
+        itemCount: items.length,
+        elapsed: DateTime.now().difference(startedAt),
+      );
       return true;
     } catch (e) {
       _lastSubmitError ??= 'network_or_exception';
-      debugPrint('SEND ORDER ERROR: $e');
+      _logOrderSubmit(
+        'http_error',
+        requestId: resolvedRequestId,
+        table: order.table,
+        reason: _lastSubmitError,
+        itemCount: lines.length,
+        elapsed: DateTime.now().difference(startedAt),
+        error: e,
+      );
     }
     return false;
   }
