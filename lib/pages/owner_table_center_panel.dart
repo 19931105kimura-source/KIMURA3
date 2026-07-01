@@ -23,6 +23,7 @@ class OwnerTableCenterPanel extends StatefulWidget {
 class _OwnerTableCenterPanelState extends State<OwnerTableCenterPanel> {
   bool _printing = false;
   bool _loadingDetail = false;
+  bool _deletingOrders = false;
   String? _detailLoadedFor;
   String? _lastDetailSummaryKey;
 
@@ -48,6 +49,10 @@ class _OwnerTableCenterPanelState extends State<OwnerTableCenterPanel> {
 
   Future<void> _loadTableDetail({bool force = false}) async {
     if (!mounted || _loadingDetail) return;
+    if (_deletingOrders ||
+        context.read<OrderState>().isDeletingOrdersForTable(widget.table)) {
+      return;
+    }
     if (!force && _detailLoadedFor == widget.table) return;
     final summaryKey = _summaryKey(context.read<OrderState>());
     setState(() => _loadingDetail = true);
@@ -72,6 +77,8 @@ class _OwnerTableCenterPanelState extends State<OwnerTableCenterPanel> {
     final orderData = orderState.orderOf(widget.table);
     final displayOrder =
         orderState.realtimeOrderForDisplay(widget.table) ?? orderData;
+    final isDeletingOrders =
+        _deletingOrders || orderState.isDeletingOrdersForTable(widget.table);
     final rtTable = rtState.tables[widget.table] as Map<String, dynamic>?;
     final status = (rtTable?['status'] ?? '').toString();
     final isActive = status == 'ordering';
@@ -89,7 +96,8 @@ class _OwnerTableCenterPanelState extends State<OwnerTableCenterPanel> {
     if (_detailLoadedFor == widget.table &&
         _lastDetailSummaryKey != null &&
         _lastDetailSummaryKey != currentSummaryKey &&
-        !_loadingDetail) {
+        !_loadingDetail &&
+        !isDeletingOrders) {
       WidgetsBinding.instance.addPostFrameCallback(
         (_) => _loadTableDetail(force: true),
       );
@@ -403,39 +411,57 @@ class _OwnerTableCenterPanelState extends State<OwnerTableCenterPanel> {
               ),
 
               TextButton(
-                onPressed: displayOrder != null && displayOrder.lines.isNotEmpty
+                onPressed:
+                    !isDeletingOrders &&
+                        displayOrder != null &&
+                        displayOrder.lines.isNotEmpty
                     ? () async {
                         final confirmed = await confirmOrderDeletion(context);
                         if (!confirmed || !context.mounted) return;
 
-                        final ok = await orderState.removeOrdersForTable(
-                          widget.table,
-                        );
-                        if (!ok) {
-                          if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('注文削除の同期に失敗しました。再試行してください。'),
-                            ),
+                        setState(() {
+                          _deletingOrders = true;
+                          _detailLoadedFor = null;
+                          _lastDetailSummaryKey = null;
+                        });
+
+                        try {
+                          final ok = await orderState.removeOrdersForTable(
+                            widget.table,
                           );
-                          return;
-                        }
-                        final ended = await orderState.endTable(widget.table);
-                        if (!context.mounted) return;
-                        if (!ended) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                '注文は削除しましたが、席を終了できませんでした。もう一度「終了」を押してください。',
+                          if (!ok) {
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('注文削除の同期に失敗しました。再試行してください。'),
                               ),
-                            ),
-                          );
-                          return;
+                            );
+                            return;
+                          }
+                          final ended = await orderState.endTable(widget.table);
+                          if (!context.mounted) return;
+                          if (!ended) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  '注文は削除しましたが、席を終了できませんでした。もう一度「終了」を押してください。',
+                                ),
+                              ),
+                            );
+                            return;
+                          }
+                          Navigator.pop(context);
+                        } finally {
+                          if (mounted) {
+                            setState(() => _deletingOrders = false);
+                          }
                         }
-                        Navigator.pop(context);
                       }
                     : null,
-                child: const Text('注文削除', style: TextStyle(color: Colors.red)),
+                child: Text(
+                  isDeletingOrders ? '削除中...' : '注文削除',
+                  style: const TextStyle(color: Colors.red),
+                ),
               ),
 
               TextButton(

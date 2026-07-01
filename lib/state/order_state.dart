@@ -180,10 +180,13 @@ class OrderState extends ChangeNotifier {
   String? _lastSubmitError;
   int? _lastSubmitStatusCode;
   bool _orderSubmitInProgress = false;
+  final Set<String> _tablesDeletingOrders = {};
 
   String? get lastSubmitError => _lastSubmitError;
   int? get lastSubmitStatusCode => _lastSubmitStatusCode;
   bool get orderSubmitInProgress => _orderSubmitInProgress;
+  bool isDeletingOrdersForTable(String table) =>
+      _tablesDeletingOrders.contains(table);
   String buildSubmitErrorMessageJa() {
     switch (_lastSubmitError) {
       case 'order_in_progress':
@@ -436,6 +439,8 @@ class OrderState extends ChangeNotifier {
   }
 
   Future<bool> fetchRealtimeTableDetail(String table) async {
+    if (isDeletingOrdersForTable(table)) return false;
+
     try {
       final requestVersion = _tableMutationVersion(table);
       final encoded = Uri.encodeComponent(table);
@@ -1349,17 +1354,21 @@ class OrderState extends ChangeNotifier {
     if (targetIndex == -1) return false;
 
     final targetOrder = _orders[targetIndex];
+    final targetTable = targetOrder.table;
+    if (isDeletingOrdersForTable(targetTable)) return false;
+
     String? archivedHistoryId;
     var serverDeleteCommitted = false;
     try {
-      _bumpTableMutationVersion(targetOrder.table);
+      _tablesDeletingOrders.add(targetTable);
+      _bumpTableMutationVersion(targetTable);
+      notifyListeners();
+
       archivedHistoryId = await _archiveDeletedOrder(targetOrder);
       if (archivedHistoryId == null) {
         throw Exception('archive deleted order failed');
       }
 
-      final targetTable = targetOrder.table;
-      _bumpTableMutationVersion(targetTable);
       final remainingLinesOnTable = _orders
           .where((o) => o.id != targetOrder.id && o.table == targetTable)
           .expand((o) => o.lines)
@@ -1368,7 +1377,7 @@ class OrderState extends ChangeNotifier {
       await _syncTableLinesToServer(targetTable, remainingLinesOnTable);
 
       serverDeleteCommitted = true;
-      _orders.removeAt(targetIndex);
+      _orders.removeWhere((order) => order.id == targetOrder.id);
       _clearRealtimeOrderCacheForTable(targetTable);
 
       try {
@@ -1384,17 +1393,26 @@ class OrderState extends ChangeNotifier {
         await _deleteArchivedOrderHistory(archivedHistoryId);
       }
       return false;
+    } finally {
+      if (_tablesDeletingOrders.remove(targetTable)) {
+        notifyListeners();
+      }
     }
   }
 
   Future<bool> removeOrdersForTable(String table) async {
+    if (isDeletingOrdersForTable(table)) return false;
+
     final targetOrder = realtimeOrderForDisplay(table) ?? orderOf(table);
     if (targetOrder == null || targetOrder.lines.isEmpty) return false;
 
     String? archivedHistoryId;
     var serverDeleteCommitted = false;
     try {
+      _tablesDeletingOrders.add(table);
       _bumpTableMutationVersion(table);
+      notifyListeners();
+
       archivedHistoryId = await _archiveDeletedOrder(targetOrder);
       if (archivedHistoryId == null) {
         throw Exception('archive deleted order failed');
@@ -1419,6 +1437,10 @@ class OrderState extends ChangeNotifier {
         await _deleteArchivedOrderHistory(archivedHistoryId);
       }
       return false;
+    } finally {
+      if (_tablesDeletingOrders.remove(table)) {
+        notifyListeners();
+      }
     }
   }
 
