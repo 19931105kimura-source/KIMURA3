@@ -438,18 +438,7 @@ class _OwnerTableCenterPanelState extends State<OwnerTableCenterPanel> {
                             );
                             return;
                           }
-                          final ended = await orderState.endTable(widget.table);
                           if (!context.mounted) return;
-                          if (!ended) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  '注文は削除しましたが、席を終了できませんでした。もう一度「終了」を押してください。',
-                                ),
-                              ),
-                            );
-                            return;
-                          }
                           Navigator.pop(context);
                         } finally {
                           if (mounted) {

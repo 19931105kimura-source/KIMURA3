@@ -1472,23 +1472,24 @@ class OrderState extends ChangeNotifier {
     final targetOrder = realtimeOrderForDisplay(table) ?? orderOf(table);
     if (targetOrder == null || targetOrder.lines.isEmpty) return false;
 
-    String? archivedHistoryId;
-    var serverDeleteCommitted = false;
     try {
       _tablesDeletingOrders.add(table);
       _bumpTableMutationVersion(table);
       notifyListeners();
 
-      archivedHistoryId = await _archiveDeletedOrder(targetOrder);
-      if (archivedHistoryId == null) {
-        throw Exception('archive deleted order failed');
-      }
+      await _deleteTableOrdersOnServer(targetOrder);
 
-      await _syncTableLinesToServer(table, const <OrderLine>[]);
-
-      serverDeleteCommitted = true;
       _orders.removeWhere((order) => order.table == table);
       _clearRealtimeOrderCacheForTable(table);
+      _activeTables.remove(table);
+      realtimeTableStatus[table] = 'closed';
+      final rt = realtimeTables[table];
+      if (rt is Map<String, dynamic>) {
+        final next = Map<String, dynamic>.from(rt);
+        next['status'] = 'closed';
+        realtimeTables[table] = next;
+      }
+      clearTableTimer(table);
 
       try {
         await _save();
@@ -1499,14 +1500,36 @@ class OrderState extends ChangeNotifier {
       return true;
     } catch (e) {
       debugPrint('REMOVE TABLE ORDERS ERROR: $e');
-      if (!serverDeleteCommitted && archivedHistoryId != null) {
-        await _deleteArchivedOrderHistory(archivedHistoryId);
-      }
       return false;
     } finally {
       if (_tablesDeletingOrders.remove(table)) {
         notifyListeners();
       }
+    }
+  }
+
+  Future<void> _deleteTableOrdersOnServer(Order order) async {
+    final uri = ServerConfig.api('/api/orders/delete-table');
+    final res = await http
+        .post(
+          uri,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'orderId': order.id,
+            'tableId': order.table,
+            'createdAt': order.createdAt.toIso8601String(),
+            'lines': order.lines.map((line) => line.toJson()).toList(),
+          }),
+        )
+        .timeout(const Duration(seconds: 12));
+
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+      throw Exception('delete-table failed: ${res.statusCode}');
+    }
+
+    final body = jsonDecode(res.body);
+    if (body is! Map || body['ok'] != true) {
+      throw Exception('delete-table rejected');
     }
   }
 

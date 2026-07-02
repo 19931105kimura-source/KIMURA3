@@ -1399,6 +1399,71 @@ app.post("/api/deleted-orders/archive", (req, res) => {
   }
 });
 
+app.post("/api/orders/delete-table", (req, res) => {
+  const startedAt = Date.now();
+  const table = normalizeTableName(req.body?.tableId ?? req.body?.table);
+  const lines = Array.isArray(req.body?.lines) ? req.body.lines : [];
+  const originalOrderId = String(req.body?.orderId ?? "");
+  const createdAt = String(req.body?.createdAt ?? new Date().toISOString());
+  let archivedEntry = null;
+
+  try {
+    if (!table || lines.length === 0) {
+      return res.status(400).json({
+        ok: false,
+        error: "table and lines required",
+      });
+    }
+
+    archivedEntry = {
+      id: makeDeletedOrderId(),
+      originalOrderId,
+      originalTable: table,
+      deletedAt: new Date().toISOString(),
+      restoredAt: null,
+      restoredToTable: null,
+      createdAt,
+      lines,
+    };
+
+    const deletedOrders = readDeletedOrders();
+    deletedOrders.unshift(archivedEntry);
+    saveDeletedOrders(deletedOrders);
+
+    replaceTableItems(table, []);
+    const currentTable = store.getTable(table) || store.openTable(table);
+    if (currentTable) {
+      store.closeTable(table);
+    }
+
+    broadcastSnapshot({ tableId: table });
+    orderLog("delete_table_done", {
+      tableId: table,
+      historyId: archivedEntry.id,
+      items: lines.length,
+      elapsedMs: Date.now() - startedAt,
+    });
+
+    res.json({ ok: true, entry: archivedEntry });
+  } catch (e) {
+    if (archivedEntry) {
+      try {
+        const deletedOrders = readDeletedOrders();
+        saveDeletedOrders(
+          deletedOrders.filter((item) => item.id !== archivedEntry.id)
+        );
+      } catch (rollbackError) {
+        console.error("DELETE TABLE ORDER ROLLBACK ERROR:", rollbackError);
+      }
+    }
+    console.error("DELETE TABLE ORDER ERROR:", {
+      table,
+      message: e?.message || String(e),
+    });
+    res.status(500).json({ ok: false, error: "delete table order failed" });
+  }
+});
+
 app.post("/api/deleted-orders/:id/restore", (req, res) => {
   let rollbackState = null;
   let rollbackTableId = null;
