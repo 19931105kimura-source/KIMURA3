@@ -150,6 +150,7 @@ applyPrinterSettingsToEnv(readPrinterSettings());
 const processedOrderRequests = new Map(); // requestId -> response payload
 const pendingOrderRequests = new Map(); // requestId -> { promise, resolve, expiresAt }
 const REQUEST_TTL_MS = 1000 * 60 * 30;
+const recentDiagnosticLogs = [];
 
 
 function orderLog(label, fields = {}) {
@@ -158,7 +159,22 @@ function orderLog(label, fields = {}) {
     if (value === undefined || value === null || value === "") continue;
     parts.push(`${key}=${value}`);
   }
-  console.log(parts.join(" "));
+  const message = parts.join(" ");
+  console.log(message);
+  rememberDiagnosticLog({ source: "server", message });
+}
+
+function rememberDiagnosticLog({ source = "server", message = "" }) {
+  const text = String(message || "").trim();
+  if (!text) return;
+  recentDiagnosticLogs.push({
+    at: new Date().toISOString(),
+    source,
+    message: text.slice(0, 2000),
+  });
+  if (recentDiagnosticLogs.length > 500) {
+    recentDiagnosticLogs.splice(0, recentDiagnosticLogs.length - 500);
+  }
 }
 
 function rememberOrderRequest(requestId, payload) {
@@ -1560,6 +1576,26 @@ app.post("/api/promos/delete-file", (req, res) => {
     fs.unlinkSync(filePath);
   }
 
+  res.json({ ok: true });
+});
+
+app.get("/api/diagnostics/order-logs", (req, res) => {
+  res.json({
+    ok: true,
+    logs: recentDiagnosticLogs.slice(-500).reverse(),
+  });
+});
+
+app.delete("/api/diagnostics/order-logs", (req, res) => {
+  recentDiagnosticLogs.length = 0;
+  res.json({ ok: true });
+});
+
+app.post("/api/diagnostics/client-log", (req, res) => {
+  rememberDiagnosticLog({
+    source: "client",
+    message: req.body?.message,
+  });
   res.json({ ok: true });
 });
 

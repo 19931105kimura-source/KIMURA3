@@ -10,6 +10,7 @@ import 'cart_state.dart';
 
 import '../billing/billing_calculator.dart';
 import '../data/server_config.dart';
+import 'diagnostic_log_state.dart';
 
 /// =======================
 /// テーブルの時間情報
@@ -1812,21 +1813,39 @@ class OrderState extends ChangeNotifier {
     Duration? elapsed,
     Object? error,
   }) {
-    debugPrint(
-      '[ORDER_SUBMIT] phase=$phase'
-      '${requestId == null ? '' : ' requestId=$requestId'}'
-      '${table == null ? '' : ' table=$table'}'
-      '${reason == null ? '' : ' reason=$reason'}'
-      '${statusCode == null ? '' : ' status=$statusCode'}'
-      '${itemCount == null ? '' : ' items=$itemCount'}'
-      '${elapsed == null ? '' : ' elapsedMs=${elapsed.inMilliseconds}'}'
-      ' canSubmit=$canSubmitOrders'
-      ' fresh=$hasFreshSnapshot'
-      ' needsResync=$_needsResync'
-      ' inProgress=$_orderSubmitInProgress'
-      '${_lastSyncedAt == null ? '' : ' lastSyncedAt=${_lastSyncedAt!.toIso8601String()}'}'
-      '${error == null ? '' : ' error=$error'}',
-    );
+    final message =
+        '[ORDER_SUBMIT] phase=$phase'
+        '${requestId == null ? '' : ' requestId=$requestId'}'
+        '${table == null ? '' : ' table=$table'}'
+        '${reason == null ? '' : ' reason=$reason'}'
+        '${statusCode == null ? '' : ' status=$statusCode'}'
+        '${itemCount == null ? '' : ' items=$itemCount'}'
+        '${elapsed == null ? '' : ' elapsedMs=${elapsed.inMilliseconds}'}'
+        ' canSubmit=$canSubmitOrders'
+        ' fresh=$hasFreshSnapshot'
+        ' needsResync=$_needsResync'
+        ' inProgress=$_orderSubmitInProgress'
+        '${_lastSyncedAt == null ? '' : ' lastSyncedAt=${_lastSyncedAt!.toIso8601String()}'}'
+        '${error == null ? '' : ' error=$error'}';
+
+    debugPrint(message);
+    DiagnosticLogState.instance.add(message, source: 'client');
+    unawaited(_sendDiagnosticClientLog(message));
+  }
+
+  Future<void> _sendDiagnosticClientLog(String message) async {
+    try {
+      final uri = ServerConfig.api('/api/diagnostics/client-log');
+      await http
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'message': message}),
+          )
+          .timeout(const Duration(seconds: 3));
+    } catch (_) {
+      // 診断ログ送信の失敗で注文処理を止めない。
+    }
   }
 
   Future<bool> sendOrderToServer(

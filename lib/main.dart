@@ -14,6 +14,7 @@ import 'state/order_state.dart';
 import 'state/promo_state.dart';
 import 'state/set_data.dart';
 import 'state/realtime_state.dart';
+import 'state/diagnostic_log_state.dart';
 
 // ---- pages ----
 import 'pages/login_page.dart';
@@ -36,6 +37,7 @@ Future<void> main() async {
         ChangeNotifierProvider(create: (_) => CartState()),
         ChangeNotifierProvider(create: (_) => PromoState()),
         ChangeNotifierProvider(create: (_) => SetData()),
+        ChangeNotifierProvider.value(value: DiagnosticLogState.instance),
 
         // --- master data ---
         ChangeNotifierProvider(create: (_) => CastData()),

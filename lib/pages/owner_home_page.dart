@@ -12,7 +12,7 @@ import 'owner_other_item_edit_page.dart'; // ✅ 追加
 import 'owner_printer_settings.dart';
 import 'owner_seat_status_page.dart';
 import 'owner_deleted_orders_page.dart';
-
+import 'owner_diagnostic_logs_page.dart';
 
 class OwnerHomePage extends StatelessWidget {
   const OwnerHomePage({super.key});
@@ -33,9 +33,7 @@ class OwnerHomePage extends StatelessWidget {
         );
       });
 
-      return const Scaffold(
-        body: Center(child: Text('権限がありません')),
-      );
+      return const Scaffold(body: Center(child: Text('権限がありません')));
     }
 
     return Scaffold(
@@ -100,7 +98,9 @@ class OwnerHomePage extends StatelessWidget {
                   onTap: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const OwnerCategoryPage()),
+                      MaterialPageRoute(
+                        builder: (_) => const OwnerCategoryPage(),
+                      ),
                     );
                   },
                 ),
@@ -136,77 +136,91 @@ class OwnerHomePage extends StatelessWidget {
                     );
                   },
                 ),
-             _MenuCard(
-  icon: Icons.people,
-  title: 'キャスト管理',
-  onTap: () {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const OwnerCastPage()),
-    );
-  },
-),
-_MenuCard(
-  icon: Icons.local_bar,
-  title: 'キャストドリンク編集',
-  onTap: () {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const OwnerCastDrinkPage()),
-    );
-  },
-),
-   _MenuCard(
-  icon: Icons.inventory_2,
-  title: 'セット編集',
-  onTap: () {
+                _MenuCard(
+                  icon: Icons.people,
+                  title: 'キャスト管理',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const OwnerCastPage()),
+                    );
+                  },
+                ),
+                _MenuCard(
+                  icon: Icons.local_bar,
+                  title: 'キャストドリンク編集',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const OwnerCastDrinkPage(),
+                      ),
+                    );
+                  },
+                ),
+                _MenuCard(
+                  icon: Icons.inventory_2,
+                  title: 'セット編集',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const OwnerSetEditPage(),
+                      ),
+                    );
+                  },
+                ),
+                _MenuCard(
+                  icon: Icons.print,
+                  title: 'プリンターIP設定',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const OwnerPrinterSettingsPage(),
+                      ),
+                    );
+                  },
+                ),
+                _MenuCard(
+                  icon: Icons.edit,
+                  title: 'その他編集',
 
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const OwnerOtherItemEditPage(),
+                      ),
+                    );
+                  },
+                ),
 
-  Navigator.push(
-  context,
-  MaterialPageRoute(
-    builder: (_) => const OwnerSetEditPage(),
-  ),
-);
-
-},
-
-),
-       _MenuCard(
-  icon: Icons.print,
-  title: 'プリンターIP設定',
-  onTap: () {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const OwnerPrinterSettingsPage()),
-    );
-  },
-),
-       _MenuCard(
-  icon: Icons.edit,
-  title: 'その他編集',
-
-  onTap: () {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const OwnerOtherItemEditPage()),
-    );
-  },
-),
-
-       _MenuCard(
-  icon: Icons.restore,
-  title: '削除履歴',
-  onTap: () {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const OwnerDeletedOrdersPage()),
-    );
-  },
-),
-
+                _MenuCard(
+                  icon: Icons.restore,
+                  title: '削除履歴',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const OwnerDeletedOrdersPage(),
+                      ),
+                    );
+                  },
+                ),
+                _MenuCard(
+                  icon: Icons.bug_report,
+                  title: '診断ログ',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const OwnerDiagnosticLogsPage(),
+                      ),
+                    );
+                  },
+                ),
               ],
-
             );
           },
         ),
@@ -232,13 +246,13 @@ class _MenuCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(16),
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10), // ✅ 余白を最適化
+        padding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 10,
+        ), // ✅ 余白を最適化
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: Colors.grey.shade400,
-            width: 2,
-          ),
+          border: Border.all(color: Colors.grey.shade400, width: 2),
         ),
         child: Center(
           child: Column(
